@@ -8,11 +8,14 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "node --check src/main.js src/config.js src/world.js src/physics.js src/vehicles.js src/audio.js src/fx.js src/ui.js && tsc --noEmit"
+    "lint": "node --check src/main.js src/config.js src/world.js src/physics.js src/vehicles.js src/audio.js src/fx.js src/ui.js src/qa.js && tsc --noEmit"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.0"
+  },
+  "dependencies": {
+    "three": "^0.187.0"
   }
 }

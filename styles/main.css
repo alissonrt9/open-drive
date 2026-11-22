@@ -906,7 +906,98 @@ select:focus {
   color: #ffb8b8;
 }
 
-/* Tela de erro amigável caso o CDN do Three.js ou WebGL falhem */
+/* Overlay de diagnóstico QA & Bisseção (Tecla F3 ou ?qa=1) */
+#qaDebug {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 16;
+  display: none;
+  width: 274px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(8, 12, 18, 0.90);
+  border: 1px solid rgba(255, 138, 61, 0.45);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(10px);
+  color: #e6ecf4;
+  font: 500 11px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  pointer-events: auto;
+}
+
+#qaDebug.on {
+  display: block;
+}
+
+.qa-stats {
+  white-space: pre;
+  margin-bottom: 8px;
+}
+
+.qa-sec {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: rgba(255, 138, 61, 0.9);
+  margin: 6px 0 4px;
+}
+
+.qa-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.qa-grid.qa-tm {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.qa-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.qa-btn {
+  padding: 4px 5px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #aeb8c6;
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.qa-btn:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #fff;
+}
+
+.qa-btn.on {
+  background: rgba(255, 138, 61, 0.24);
+  border-color: var(--ac);
+  color: #fff;
+}
+
+.qa-btn.qa-act {
+  background: rgba(92, 174, 255, 0.14);
+  border-color: rgba(92, 174, 255, 0.4);
+  color: #d6ecff;
+}
+
+.qa-summary {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 10px;
+  color: #cdd6e2;
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* Tela de erro amigável caso WebGL ou módulos 3D falhem */
 #bootError {
   position: fixed;
   inset: 0;

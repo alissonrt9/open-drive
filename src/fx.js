@@ -1,4 +1,4 @@
-/* global THREE */
+import * as THREE from 'three';
 
 import { car, state, P } from './config.js';
 import { S, getGroundY } from './world.js';
@@ -20,6 +20,7 @@ const skidMat = new THREE.MeshBasicMaterial({
 
 const skidMesh = new THREE.InstancedMesh(skidGeo, skidMat, SKID_MAX);
 skidMesh.frustumCulled = false;
+skidMesh.userData.noAO = true;
 S.add(skidMesh);
 
 // ---------- pool leve de partículas 3D (fumaça de pneu e poeira off-road)
@@ -34,6 +35,7 @@ const partMat = new THREE.MeshLambertMaterial({
 
 const partMesh = new THREE.InstancedMesh(partGeo, partMat, PART_MAX);
 partMesh.frustumCulled = false;
+partMesh.userData.noAO = true;
 S.add(partMesh);
 
 const partData = Array.from({ length: PART_MAX }, () => ({

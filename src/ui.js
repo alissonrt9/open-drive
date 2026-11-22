@@ -1,5 +1,5 @@
 import { $, TAU, cl, CARS, car, BIOMES, biome, TOD, TUNING_PRESETS, tuning, saveTuning, saveBiomeChoice, applyTuningPreset, set, state, P, IN } from './config.js';
-import { R, cam, sun, IM, rain, cx, applyEnv, bloomPass, resizeComposer, setBiome } from './world.js';
+import { R, cam, IM, rain, cx, applyEnv, resizeComposer, setBiome, setQualityPipeline } from './world.js';
 import { CO, co, TR, placeCar, importVehicleFiles } from './vehicles.js';
 import { aInit, eBuild, resumeAudio, setMasterVolume } from './audio.js';
 import { startDrive } from './physics.js';
@@ -559,14 +559,7 @@ export function qual() {
   const dpr = typeof devicePixelRatio === 'number' ? devicePixelRatio : 1;
   const pr = [0.85, Math.min(dpr, 1.5), Math.min(dpr, 2.0)][q];
   R.setPixelRatio(pr);
-  sun.castShadow = q > 0;
-  const ms = [512, 1024, 2048][q];
-  sun.shadow.mapSize.set(ms, ms);
-  if (sun.shadow.map) {
-    sun.shadow.map.dispose();
-    sun.shadow.map = null;
-  }
-  if (bloomPass) bloomPass.enabled = q >= 2;
+  setQualityPipeline(q);
   state.qT = [0.42, 0.78, 1][q];
   IM.forEach(m => m.reset());
   rain.geometry.setDrawRange(0, [250, 500, 800][q] * 2);

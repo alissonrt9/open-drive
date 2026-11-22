@@ -1,10 +1,10 @@
-/* global THREE */
-
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { cl, lp, wrap, TY, CARS, car, set, state, P } from './config.js';
-import { S, cam, spot, headFill, cx, ry, getGroundY, onEnvChange } from './world.js';
+import { S, cam, spot, headFill, cx, ry, getGroundY, onEnvChange, registerMaterialCSM } from './world.js';
 
 function prepVehTex(tex, srgb = true) {
-  if (srgb) tex.encoding = THREE.sRGBEncoding;
+  tex.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   tex.anisotropy = 8;
   if (THREE.LinearMipmapLinearFilter) tex.minFilter = THREE.LinearMipmapLinearFilter;
   if (THREE.LinearFilter) tex.magFilter = THREE.LinearFilter;
@@ -127,65 +127,70 @@ const leatherMap = createLeatherTexture();
 // ---------- materiais PBR automotivos
 export const M = {
   glass: new THREE.MeshPhysicalMaterial({
-    color: 0x0a1018,
-    metalness: 0.1,
-    roughness: 0.04,
+    color: 0x05080d,
+    metalness: 0.08,
+    roughness: 0.06,
     transparent: true,
-    opacity: 0.58,
-    clearcoat: 1.0,
-    clearcoatRoughness: 0.03,
-    reflectivity: 1.0,
-    envMapIntensity: 1.45,
+    opacity: 0.78,
+    clearcoat: 0.9,
+    clearcoatRoughness: 0.04,
+    reflectivity: 0.85,
+    envMapIntensity: 0.68,
     depthWrite: false
   }),
   engineGlass: new THREE.MeshPhysicalMaterial({
-    color: 0x0f151d,
-    metalness: 0.12,
-    roughness: 0.04,
+    color: 0x070b10,
+    metalness: 0.1,
+    roughness: 0.06,
     transparent: true,
-    opacity: 0.52,
-    clearcoat: 1.0,
-    reflectivity: 1.0,
-    envMapIntensity: 1.35,
+    opacity: 0.72,
+    clearcoat: 0.9,
+    reflectivity: 0.85,
+    envMapIntensity: 0.68,
     depthWrite: false
   }),
-  carbon: new THREE.MeshStandardMaterial({ map: carbonMap, color: 0xffffff, metalness: 0.36, roughness: 0.36, envMapIntensity: 0.85 }),
-  diffuser: new THREE.MeshStandardMaterial({ color: 0x15181d, metalness: 0.14, roughness: 0.78 }),
-  grille: new THREE.MeshStandardMaterial({ color: 0x0c0e11, metalness: 0.2, roughness: 0.78 }),
-  chrome: new THREE.MeshStandardMaterial({ color: 0xe6ecf4, metalness: 0.95, roughness: 0.10, envMapIntensity: 1.35 }),
-  engineAlloy: new THREE.MeshStandardMaterial({ color: 0xbec7d2, metalness: 0.88, roughness: 0.22 }),
+  carbon: new THREE.MeshStandardMaterial({ map: carbonMap, color: 0xffffff, metalness: 0.34, roughness: 0.38, envMapIntensity: 0.55 }),
+  diffuser: new THREE.MeshStandardMaterial({ color: 0x15181d, metalness: 0.14, roughness: 0.78, envMapIntensity: 0.35 }),
+  grille: new THREE.MeshStandardMaterial({ color: 0x0c0e11, metalness: 0.2, roughness: 0.78, envMapIntensity: 0.30 }),
+  chrome: new THREE.MeshStandardMaterial({ color: 0xdce2ea, metalness: 0.92, roughness: 0.12, envMapIntensity: 0.85 }),
+  engineAlloy: new THREE.MeshStandardMaterial({ color: 0xbec7d2, metalness: 0.88, roughness: 0.22, envMapIntensity: 0.65 }),
   engineRed: new THREE.MeshStandardMaterial({ color: 0xb61818, metalness: 0.45, roughness: 0.30 }),
   engineGold: new THREE.MeshStandardMaterial({ color: 0xc89a3e, metalness: 0.78, roughness: 0.24 }),
   tire: new THREE.MeshStandardMaterial({
     map: tireMap,
     color: 0xffffff,
-    roughness: 0.84,
-    metalness: 0.04,
-    envMapIntensity: 0.34
+    roughness: 0.86,
+    metalness: 0.03,
+    envMapIntensity: 0.20
   }),
-  tireWall: new THREE.MeshStandardMaterial({ color: 0x171a20, roughness: 0.82, metalness: 0.04 }),
-  rim: new THREE.MeshStandardMaterial({ color: 0xd5dce5, metalness: 0.90, roughness: 0.16, envMapIntensity: 1.3 }),
+  tireWall: new THREE.MeshStandardMaterial({ color: 0x171a20, roughness: 0.84, metalness: 0.04, envMapIntensity: 0.20 }),
+  rim: new THREE.MeshStandardMaterial({ color: 0xcfd6df, metalness: 0.88, roughness: 0.18, envMapIntensity: 0.82 }),
   rimCap: new THREE.MeshStandardMaterial({ color: 0x1f242c, metalness: 0.75, roughness: 0.25 }),
   brakeDisc: new THREE.MeshStandardMaterial({ color: 0x9aa3ae, metalness: 0.86, roughness: 0.28 }),
   caliperRed: new THREE.MeshStandardMaterial({ color: 0xe22020, metalness: 0.42, roughness: 0.24 }),
   caliperYellow: new THREE.MeshStandardMaterial({ color: 0xf4ba08, metalness: 0.42, roughness: 0.24 }),
-  dark: new THREE.MeshStandardMaterial({ color: 0x191d24, roughness: 0.70, metalness: 0.1 }),
+  dark: new THREE.MeshStandardMaterial({ color: 0x191d24, roughness: 0.72, metalness: 0.1, envMapIntensity: 0.25 }),
   seatCloth: new THREE.MeshStandardMaterial({ map: leatherMap, color: 0xffffff, roughness: 0.78, metalness: 0.08 }),
   rollCage: new THREE.MeshStandardMaterial({ color: 0x2f3642, metalness: 0.65, roughness: 0.30 }),
   dashTrim: new THREE.MeshStandardMaterial({ map: leatherMap, color: 0xd0d6e0, roughness: 0.48, metalness: 0.28 }),
-  clusterGlow: new THREE.MeshStandardMaterial({ color: 0x0d1b2a, emissive: 0x2ea8ff, emissiveIntensity: 1.45, roughness: 0.25 }),
-  screenGlow: new THREE.MeshStandardMaterial({ color: 0x0b1622, emissive: 0x1e6ca8, emissiveIntensity: 1.05, roughness: 0.2 }),
-  accentOrange: new THREE.MeshStandardMaterial({ color: 0xff8a3d, emissive: 0xff8a3d, emissiveIntensity: 0.8, roughness: 0.32 }),
-  plate: new THREE.MeshStandardMaterial({ color: 0xeef3f8, emissive: 0xd4e2f2, emissiveIntensity: 0.85, roughness: 0.28, metalness: 0.05 }),
-  drl: new THREE.MeshStandardMaterial({ color: 0xf4f9ff, emissive: 0xeef6ff, emissiveIntensity: 2.4, roughness: 0.16 }),
-  head: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff5dc, emissiveIntensity: 2.0, roughness: 0.12 }),
-  tailT: new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff1111, emissiveIntensity: 2.2, roughness: 0.14 })
+  clusterGlow: new THREE.MeshStandardMaterial({ color: 0x0d1b2a, emissive: 0x2ea8ff, emissiveIntensity: 0.95, roughness: 0.25 }),
+  screenGlow: new THREE.MeshStandardMaterial({ color: 0x0b1622, emissive: 0x1e6ca8, emissiveIntensity: 0.75, roughness: 0.2 }),
+  accentOrange: new THREE.MeshStandardMaterial({ color: 0xff8a3d, emissive: 0xff8a3d, emissiveIntensity: 0.45, roughness: 0.32 }),
+  plate: new THREE.MeshStandardMaterial({ color: 0xe4eaf0, emissive: 0xd4e2f2, emissiveIntensity: 0.22, roughness: 0.32, metalness: 0.05 }),
+  drl: new THREE.MeshStandardMaterial({ color: 0xf4f9ff, emissive: 0xeef6ff, emissiveIntensity: 1.15, roughness: 0.18 }),
+  head: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff5dc, emissiveIntensity: 1.05, roughness: 0.14 }),
+  tailT: new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff1111, emissiveIntensity: 1.10, roughness: 0.16 })
 };
 
+Object.values(M).forEach(mat => {
+  if (mat && !mat.transparent) registerMaterialCSM(mat, 'veh_shared');
+});
+
 onEnvChange(({ night, lowSun, wet }) => {
-  M.drl.emissiveIntensity = night ? 3.8 : (lowSun || wet ? 2.8 : 2.4);
-  M.head.emissiveIntensity = night ? 4.8 : (lowSun || wet ? 2.7 : 2.0);
-  M.tailT.emissiveIntensity = night ? 3.2 : (lowSun || wet ? 2.6 : 2.2);
+  M.drl.emissiveIntensity = night ? 3.4 : (lowSun || wet ? 1.85 : 1.15);
+  M.head.emissiveIntensity = night ? 4.4 : (lowSun || wet ? 1.95 : 1.05);
+  M.tailT.emissiveIntensity = night ? 3.0 : (lowSun || wet ? 1.65 : 1.10);
+  M.plate.emissiveIntensity = night ? 0.85 : 0.22;
 });
 
 const cockpitOffset = {
@@ -277,7 +282,7 @@ const contactShadowMat = (() => {
 // ---------- carregador de modelos reais (.glb / .gltf) + texturas e Drag-and-Drop
 function enhanceTexture(tex, isColor) {
   if (!tex) return;
-  if (isColor) tex.encoding = THREE.sRGBEncoding;
+  tex.colorSpace = isColor ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   tex.anisotropy = 8;
   tex.needsUpdate = true;
 }
@@ -305,30 +310,33 @@ function upgradeImportedMaterial(mat, nodeName, s, vehicleRefs) {
   const isNonPaint = /(glass|window|vidro|tire|tyre|rubber|pneu|chrome|metal|light|lamp|head|rim|wheel|interior|seat|dash|carbon|grille|grill|plate|license)/.test(lname + ' ' + mname);
 
   if (mat.isMeshStandardMaterial || mat.isMeshPhysicalMaterial) {
-    mat.envMapIntensity = Math.max(mat.envMapIntensity || 1.0, 1.0);
+    mat.envMapIntensity = Math.min(mat.envMapIntensity || 0.72, 0.78);
     if (!isNonPaint && !mat.map && !mat.isMeshPhysicalMaterial) {
-      return new THREE.MeshPhysicalMaterial({
+      const phys = new THREE.MeshPhysicalMaterial({
         name: mat.name,
         color: mat.color ? mat.color.clone() : new THREE.Color(s.col),
         normalMap: mat.normalMap || null,
         roughnessMap: mat.roughnessMap || null,
         metalnessMap: mat.metalnessMap || null,
         aoMap: mat.aoMap || null,
-        metalness: mat.metalness !== undefined ? Math.max(mat.metalness, 0.45) : 0.55,
-        roughness: mat.roughness !== undefined ? Math.min(mat.roughness, 0.35) : 0.22,
+        metalness: mat.metalness !== undefined ? Math.max(mat.metalness, 0.42) : 0.46,
+        roughness: mat.roughness !== undefined ? Math.min(mat.roughness, 0.35) : 0.23,
         clearcoat: 1.0,
-        clearcoatRoughness: 0.06,
+        clearcoatRoughness: 0.05,
         transparent: mat.transparent,
         opacity: mat.opacity,
         side: mat.side,
-        envMapIntensity: 1.0
+        envMapIntensity: 0.72
       });
+      if (!phys.transparent) registerMaterialCSM(phys, 'veh_glb_paint');
+      return phys;
     }
+    if (!mat.transparent) registerMaterialCSM(mat, 'veh_glb_pbr');
     mat.needsUpdate = true;
     return mat;
   }
 
-  return new THREE.MeshStandardMaterial({
+  const std = new THREE.MeshStandardMaterial({
     name: mat.name,
     color: mat.color ? mat.color.clone() : new THREE.Color(0xffffff),
     map: mat.map || null,
@@ -341,8 +349,10 @@ function upgradeImportedMaterial(mat, nodeName, s, vehicleRefs) {
     side: mat.side !== undefined ? mat.side : THREE.FrontSide,
     roughness: 0.45,
     metalness: 0.25,
-    envMapIntensity: 1.0
+    envMapIntensity: 0.65
   });
+  if (!std.transparent) registerMaterialCSM(std, 'veh_glb_std');
+  return std;
 }
 
 function normalizePartName(raw = '') {
@@ -600,13 +610,13 @@ function applyGLBToVehicle(model, s, vehicleRefs, objectUrls = [], modelName = '
 }
 
 async function tryAttachRealGLB(s, vehicleRefs) {
-  if (!s.modelUrl || typeof THREE.GLTFLoader !== 'function') return;
+  if (!s.modelUrl) return;
   try {
     const res = await fetch(s.modelUrl, { method: 'HEAD' });
     const ct = (res.headers.get('content-type') || '').toLowerCase();
     if (!res.ok || ct.includes('text/html')) return;
 
-    const loader = new THREE.GLTFLoader();
+    const loader = new GLTFLoader();
     loader.load(
       s.modelUrl,
       gltf => applyGLBToVehicle(gltf.scene, s, vehicleRefs, [], s.modelUrl.split('/').pop()),
@@ -713,10 +723,6 @@ async function applyExtraTexturesToVehicle(imageFiles, vehicleRefs) {
 
 function loadSingleModelWithManager(modelFile, companionFiles, carIndex) {
   return new Promise((resolve, reject) => {
-    if (typeof THREE.GLTFLoader !== 'function') {
-      reject(new Error('GLTFLoader indisponível'));
-      return;
-    }
     const createdUrls = [];
     const urlMap = new Map();
 
@@ -740,7 +746,7 @@ function loadSingleModelWithManager(modelFile, companionFiles, carIndex) {
       return urlMap.get(clean) || urlMap.get(base) || reqUrl;
     });
 
-    const loader = new THREE.GLTFLoader(manager);
+    const loader = new GLTFLoader(manager);
     loader.load(
       modelUrl,
       gltf => {
@@ -1079,15 +1085,15 @@ export function build(s, pl) {
   const wheelR = isSuper ? 0.35 : 0.34;
   const name = s.n || '';
 
-  const paint = new THREE.MeshPhysicalMaterial({
+  const paint = registerMaterialCSM(new THREE.MeshPhysicalMaterial({
     color: s.col,
-    metalness: 0.58,
-    roughness: 0.2,
+    metalness: 0.46,
+    roughness: 0.23,
     clearcoat: 1.0,
     clearcoatRoughness: 0.05,
-    reflectivity: 1.0,
-    envMapIntensity: 1.1
-  });
+    reflectivity: 0.92,
+    envMapIntensity: 0.72
+  }), 'veh_paint');
 
   // 1. Casco aerodinâmico paramétrico 36x24
   const hullGeo = buildLoftedHullGeo(s, t, gc);
@@ -1122,6 +1128,7 @@ export function build(s, pl) {
   const gh = buildLoftedGreenhouse(s, t, gc);
   const cab = new THREE.Mesh(gh.glassGeo, M.glass);
   cab.renderOrder = 4;
+  cab.userData.noAO = true;
   const roofMat = name.includes('M3') ? M.carbon : paint;
   const roof = new THREE.Mesh(gh.roofGeo, roofMat);
   const cPillarL = new THREE.Mesh(gh.cPillarGeoL, paint);
@@ -1180,11 +1187,12 @@ export function build(s, pl) {
     engBayGlass.position.set(bayX, bayY + 0.085, 0);
     engBayGlass.rotation.z = 0.15;
     engBayGlass.renderOrder = 5;
+    engBayGlass.userData.noAO = true;
     procGroup.add(engWell, engBlock, engBayGlass);
   }
 
   // 3. Traseira de destaque para Câmera Chase (lanternas LED exclusivas, difusor profundo, placa, 4 ponteiras)
-  const tl = pl ? M.tailT.clone() : M.tailT;
+  const tl = pl ? registerMaterialCSM(M.tailT.clone(), 'veh_tl') : M.tailT;
   const rearX = -L * 0.5;
 
   const rearFascia = new THREE.Mesh(new THREE.BoxGeometry(0.08, h * 0.28, W * 0.84), M.grille);
@@ -1479,6 +1487,7 @@ export function build(s, pl) {
   const contactPlane = new THREE.Mesh(new THREE.PlaneGeometry(L * 1.16, W * 1.22), contactShadowMat);
   contactPlane.rotation.x = -Math.PI / 2;
   contactPlane.position.y = 0.025;
+  contactPlane.userData.noAO = true;
   m.add(contactPlane);
 
   m.add(bd);
@@ -1668,8 +1677,8 @@ export function placeCar(dt, menu) {
   o.spinRear.forEach(s => { s.rotation.z = menu ? P.wAngR : pose.wAngR; });
 
   o.sw.rotation.x = -P.steer * 3;
-  // Lanternas LED traseiras: 2.2 rodando / 5.5 freando (aciona UnrealBloomPass)
-  o.tl.emissiveIntensity = P.brk ? 5.5 : (set.tod == 5 ? 3.2 : (set.tod == 4 || set.tod == 0 || set.wx == 3 ? 2.6 : 2.2));
+  // Lanternas LED traseiras: 1.10 rodando de dia (abaixo do bloom 1.45) / 5.2 freando / 3.0 noite
+  o.tl.emissiveIntensity = P.brk ? 5.2 : (set.tod == 5 ? 3.0 : (set.tod == 4 || set.tod == 0 || set.wx == 3 ? 1.65 : 1.10));
 
   // Interior permanece sempre visível através dos vidros; na câmera interna (1) oculta o vidro da cabine
   const interiorView = state.camMode == 1 && !menu;

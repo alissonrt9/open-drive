@@ -1,4 +1,4 @@
-/* global THREE */
+import * as THREE from 'three';
 
 export const $ = s => document.querySelector(s);
 
@@ -42,10 +42,10 @@ export const BIOMES = [
     short: 'VALE ALPINO',
     desc: 'Colinas verde-esmeralda, pinheiros e céu sereno',
     gripMul: 1.0,
-    skyTop: 0x4a7ab5,
-    skyHor: 0x9ec0e0,
-    groundCol: 0x26381b,
-    fogDensity: 0.00034,
+    skyTop: 0x35649e,
+    skyHor: 0x769ec4,
+    groundCol: 0x1d2b14,
+    fogDensity: 0.00026,
     particle: 'none',
     accent: '#63b87b'
   },
@@ -55,10 +55,10 @@ export const BIOMES = [
     short: 'DESERTO DOURADO',
     desc: 'Dunas onduladas, cânions terracota e cactos saguaro',
     gripMul: 0.96,
-    skyTop: 0x4b77ad,
-    skyHor: 0xdcb88e,
-    groundCol: 0x6b4326,
-    fogDensity: 0.00040,
+    skyTop: 0x376298,
+    skyHor: 0xb98d62,
+    groundCol: 0x52321b,
+    fogDensity: 0.00032,
     particle: 'dust',
     accent: '#e0914c'
   },
@@ -68,10 +68,10 @@ export const BIOMES = [
     short: 'CIDADE / METRÓPOLE',
     desc: 'Via expressa urbana, arranha-céus e postes a cada 35m',
     gripMul: 1.03,
-    skyTop: 0x456f9e,
-    skyHor: 0x9db4cc,
-    groundCol: 0x1e252e,
-    fogDensity: 0.00038,
+    skyTop: 0x325885,
+    skyHor: 0x728aa3,
+    groundCol: 0x171d24,
+    fogDensity: 0.00042,
     particle: 'none',
     accent: '#5caeff'
   },
@@ -81,10 +81,10 @@ export const BIOMES = [
     short: 'SANTUÁRIO SAKURA',
     desc: 'Cerejeiras em flor, portais Torii e Monte Fuji',
     gripMul: 1.0,
-    skyTop: 0x4d7cb2,
-    skyHor: 0xbcd0e4,
-    groundCol: 0x2e3b27,
-    fogDensity: 0.00032,
+    skyTop: 0x38669c,
+    skyHor: 0x91a7be,
+    groundCol: 0x222d1c,
+    fogDensity: 0.00028,
     particle: 'sakura',
     accent: '#ee8fab'
   },
@@ -94,23 +94,23 @@ export const BIOMES = [
     short: 'MONTANHAS NEVADAS',
     desc: 'Passo alpino invernal com neve macia e flocos no ar',
     gripMul: 0.88,
-    skyTop: 0x476f9c,
-    skyHor: 0xb4c7da,
-    groundCol: 0x627080,
-    fogDensity: 0.00044,
+    skyTop: 0x345b87,
+    skyHor: 0x899eb3,
+    groundCol: 0x45515e,
+    fogDensity: 0.00034,
     particle: 'snow',
     accent: '#8cbde8'
   }
 ];
 
-// ---------- presets de horário e atmosfera (tons harmônicos sem ofuscamento branco)
+// ---------- presets de horário e atmosfera (contraste cinematográfico, sol lateral 3/4 de dia)
 export const TOD = [
-  ['Manhã', 0x4674ab, 0xc9b9a6, 0.30, 0.55, 0xffdfb8, 2.15, 0.56],
-  ['Meio-dia', 0x4a7ab5, 0x9ec0e0, 1.12, 0.92, 0xfff5e6, 2.35, 0.60],
-  ['Fim de tarde', 0x3f679c, 0xd8b28d, 0.48, 1.92, 0xffd096, 2.15, 0.54],
-  ['Golden hour', 0x3b598a, 0xdda16a, 0.22, 2.22, 0xffa654, 2.05, 0.48],
-  ['Pôr do sol', 0x25325e, 0xd98a5f, 0.09, 2.62, 0xff7847, 1.75, 0.42],
-  ['Noite', 0x0b1220, 0x141d2e, 0.48, 3.8, 0x89a6ff, 0.58, 0.24]
+  ['Manhã', 0x37649b, 0xb2987b, 0.34, 1.88, 0xffd5a4, 3.35, 0.24],
+  ['Meio-dia', 0x3564a0, 0x7da4cc, 0.88, 1.95, 0xfff3de, 3.65, 0.25],
+  ['Fim de tarde', 0x325b91, 0xc2956b, 0.46, 2.02, 0xffc688, 3.25, 0.23],
+  ['Golden hour', 0x2f4b7a, 0xc8844c, 0.24, 2.25, 0xff9e4a, 2.95, 0.20],
+  ['Pôr do sol', 0x1e2952, 0xbb6942, 0.11, 2.58, 0xff7040, 2.35, 0.17],
+  ['Noite', 0x09101c, 0x111a2b, 0.48, 3.8, 0x89a6ff, 0.62, 0.14]
 ];
 
 // ---------- presets rápidos de dirigibilidade & regulador de tuning
@@ -300,7 +300,7 @@ export const P = {
   tractionLoss: false,
   eng: '',
   cy: 0,
-  cp: typeof THREE !== 'undefined' ? new THREE.Vector3() : { x: 0, y: 0, z: 0 }
+  cp: new THREE.Vector3()
 };
 
 export const IN = { g: 0, b: 0, s: 0, hb: 0 };

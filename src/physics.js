@@ -12,14 +12,15 @@ let uiCallbacks = {
   syncSettings: () => {},
   showToast: () => {},
   toggleTuning: () => {},
-  cycleBiome: () => {}
+  cycleBiome: () => {},
+  toggleDebug: () => {}
 };
 
 export function initInput(callbacks) {
   uiCallbacks = { ...uiCallbacks, ...callbacks };
 
   addEventListener('keydown', e => {
-    if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+    if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'F3'].includes(e.code)) {
       e.preventDefault();
     }
     if (K[e.code]) return;
@@ -84,6 +85,7 @@ export function key(c) {
   if (c == 'KeyQ') shiftDown();
   if (c == 'KeyH') uiCallbacks.toggleTuning();
   if (c == 'KeyB') uiCallbacks.cycleBiome();
+  if (c == 'F3') uiCallbacks.toggleDebug();
   if (c == 'KeyM') {
     set.tx = set.tx ? 0 : 1;
     uiCallbacks.syncSettings();

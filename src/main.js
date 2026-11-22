@@ -36,28 +36,15 @@ async function boot() {
   if (booted) return;
   booted = true;
 
-  // ---------- verificação prévia do Three.js (CDN) antes de importar módulos WebGL
-  const T = window.THREE;
-  if (!T || typeof T.WebGLRenderer !== 'function') {
+  // ---------- verificação de suporte WebGL e carregamento dos módulos ES
+  const glCanvas = document.getElementById('gl');
+  const glCheck = glCanvas && (glCanvas.getContext('webgl2') || glCanvas.getContext('webgl'));
+  if (!glCheck) {
     showBootError(
-      'Motor 3D indisponível',
-      'Não foi possível carregar o Three.js r128 via CDN. Verifique sua conexão com a internet ou bloqueadores de script e tente novamente.'
+      'WebGL indisponível',
+      'Não foi possível inicializar o contexto gráfico 3D neste navegador ou dispositivo. Verifique se a aceleração de hardware / WebGL está ativada.'
     );
     return;
-  }
-
-  const missingAddons = [];
-  if (typeof T.GLTFLoader !== 'function') missingAddons.push('importação .GLB');
-  if (typeof T.Sky !== 'function') missingAddons.push('céu físico');
-  if (
-    typeof T.EffectComposer !== 'function' ||
-    typeof T.RenderPass !== 'function' ||
-    typeof T.ShaderPass !== 'function' ||
-    typeof T.CopyShader !== 'object'
-  ) {
-    missingAddons.push('pós-processamento');
-  } else if (typeof T.UnrealBloomPass !== 'function' || typeof T.LuminosityHighPassShader !== 'object') {
-    missingAddons.push('bloom');
   }
 
   let modules;
@@ -69,37 +56,35 @@ async function boot() {
       import('./physics.js'),
       import('./audio.js'),
       import('./fx.js'),
-      import('./ui.js')
+      import('./ui.js'),
+      import('./qa.js')
     ]);
   } catch (err) {
     console.error('Erro ao inicializar módulos 3D / WebGL:', err);
     showBootError(
-      'WebGL indisponível',
-      'Não foi possível inicializar o contexto gráfico 3D neste navegador ou dispositivo. Verifique se a aceleração de hardware / WebGL está ativada.'
+      'Erro de inicialização 3D',
+      'Não foi possível carregar os módulos gráficos do OpenDrive neste navegador. Recarregue a página ou verifique o console.'
     );
     return;
   }
 
   const [
     { car, set, state, P },
-    { cx, ry, cam, sun, sdir, applyEnv, rows, IM, rainUpd, updateSkyPos, renderWorld },
+    { cx, cam, applyEnv, rows, IM, rainUpd, updateSkyPos, updateCSM, renderWorld },
     { TR, trafficUpd, placeCar, camUpd, setCockpitOffset, importVehicleFiles },
     { initInput, readIn, advancePhysics, startDrive },
     { aUpd },
     { updateFx, resetFx },
-    { fxDraw, hudUpd, show, setCar, qual, resize, syncSettings, initUI, fillGarage, showToast, hideToast, toggleTuning, cycleBiome }
+    { fxDraw, hudUpd, show, setCar, qual, resize, syncSettings, initUI, fillGarage, showToast, hideToast, toggleTuning, cycleBiome },
+    { initQA, toggleDebug, updateDebugOverlay }
   ] = modules;
 
   // ---------- inicialização explícita dos módulos e listeners globais
   initUI();
-  initInput({ show, syncSettings, showToast, toggleTuning, cycleBiome });
+  initQA();
+  initInput({ show, syncSettings, showToast, toggleTuning, cycleBiome, toggleDebug });
   setCockpitOffset({ eyeX: -0.18, eyeY: 0.06, eyeZ: 0.0, lookPitch: -1.65 });
   addEventListener('resize', resize);
-
-  if (missingAddons.length > 0) {
-    console.warn('Complementos opcionais do Three.js ausentes:', missingAddons.join(', '));
-    showToast(`Modo compatível: sem ${missingAddons.join(', ')}`, false, 4000);
-  }
 
   // ---------- suporte Drag-and-Drop instantâneo para modelos .glb / .gltf e texturas
   window.addEventListener('dragover', e => {
@@ -177,25 +162,21 @@ async function boot() {
     rainUpd(dt);
 
     updateSkyPos(cam.position, state.T);
-    const roadY = ry(P.z);
-    const sunFocusX = P.x - Math.sin(P.yaw) * 14;
-    const sunFocusZ = P.z - Math.cos(P.yaw) * 14;
-    sun.target.position.set(sunFocusX, roadY, sunFocusZ);
-    sun.position.set(sunFocusX, roadY, sunFocusZ).addScaledVector(sdir, 100);
-    sun.target.updateMatrixWorld();
+    updateCSM();
 
     aUpd();
     hudUpd();
     fxDraw();
     const speedKmh = Math.hypot(P.vx, P.vz) * 3.6;
     const lateralG = (P.yr * P.spd) / 9.81;
-    renderWorld(state.T, speedKmh, lateralG, set.wx == 3);
+    renderWorld(state.T, speedKmh, lateralG, set.wx == 3, dt);
+    updateDebugOverlay(dt);
   }
 
   // ---------- estado inicial
   resize();
   qual();
-  applyEnv();
+  applyEnv(true);
   show('menu');
   startDrive();
   resetFx();
