@@ -8,6 +8,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { Pass, FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
 import { $, TAU, cl, lp, sm, rnd, TOD, BIOMES, set, state, P, biome } from './config.js';
 
 // ---------- funções matemáticas do mundo (rodovia principal, bioma e relevo multifractal)
@@ -350,8 +351,8 @@ if (esSky.material && esSky.material.uniforms) {
   if (typeof esSky.material.fragmentShader === 'string') {
     esSky.material.fragmentShader = esSky.material.fragmentShader.replace(
       'gl_FragColor = vec4( texColor, 1.0 );',
-      `vec3 esBase = min( texColor, vec3( 24.0 ) ) * 0.082;
-      esBase = esBase / ( vec3( 1.0 ) + esBase * 0.35 );
+      `vec3 esBase = min( texColor, vec3( 24.0 ) ) * 0.24;
+      esBase = esBase / ( vec3( 1.0 ) + esBase * 0.32 );
       gl_FragColor = vec4( esBase, 1.0 );`
     );
     esSky.material.needsUpdate = true;
@@ -432,13 +433,17 @@ export const csm = new CSM({
 csm.fade = true;
 csm.lights.forEach(light => {
   light.shadow.normalBias = 0.022;
-  light.shadow.radius = 1.6;
+  light.shadow.radius = 2.2;
+  light.shadow.intensity = 0.65;
 });
 export const sun = csm.lights[0];
 
-export const hemi = new THREE.HemisphereLight(0x769ec4, 0x1d2b14, 0.25);
-export const amb = new THREE.AmbientLight(0xffffff, 0.03);
-S.add(hemi, amb);
+export const hemi = new THREE.HemisphereLight(0x88afd4, 0x4c443a, 0.95);
+export const amb = new THREE.AmbientLight(0xffffff, 0.10);
+export const cityBounceLight = new THREE.DirectionalLight(0xdccbb4, 0.0);
+cityBounceLight.castShadow = false;
+cityBounceLight.position.set(-1.15, 0.52, 0.38);
+S.add(hemi, amb, cityBounceLight);
 
 export const spot = new THREE.SpotLight(0xfff1d6, 0, 210, 0.56, 0.65, 1.25);
 export const headFill = new THREE.PointLight(0xffe9c4, 0, 62, 1.3);
@@ -601,10 +606,11 @@ export const CinematicGradeShader = {
     uSunVisibility: { value: 0.0 },
     uSunShaftColor: { value: new THREE.Color(0xffd6a0) },
     uSunShaftStrength: { value: 0.045 },
-    uShadowTint: { value: new THREE.Vector3(-0.025, 0.0, 0.04) },
-    uHighlightTint: { value: new THREE.Vector3(0.015, 0.008, -0.01) },
+    uShadowTint: { value: new THREE.Vector3(-0.022, 0.0, 0.038) },
+    uHighlightTint: { value: new THREE.Vector3(0.018, 0.009, -0.010) },
     uSaturation: { value: 1.14 },
-    uContrast: { value: 1.09 }
+    uContrast: { value: 1.08 },
+    uToeFloor: { value: 0.0115 }
   },
   vertexShader: `
     varying vec2 vUv;
@@ -628,6 +634,7 @@ export const CinematicGradeShader = {
     uniform vec3 uHighlightTint;
     uniform float uSaturation;
     uniform float uContrast;
+    uniform float uToeFloor;
     varying vec2 vUv;
 
     vec3 sampleScene(vec2 uv) {
@@ -684,14 +691,15 @@ export const CinematicGradeShader = {
         col += (shaftAcc * 0.35 + uSunShaftColor * radialFalloff * 0.14) * uSunVisibility * uSunShaftStrength;
       }
 
-      // Curva de contraste S-curve em torno de 18% gray sem lift aditivo nos pretos (lift = 0)
+      // Curva S-curve moderada em torno de 18% gray preservando sombras profundas (lift = 0 nos meios-tons)
       float lum0 = dot(col, vec3(0.2126, 0.7152, 0.0722));
       if (lum0 > 0.0001) {
-        float lumScaled = pow(lum0 / 0.18, uContrast) * 0.18;
+        float sMask = smoothstep(0.025, 0.14, lum0);
+        float lumScaled = pow(lum0 / 0.18, mix(1.0, uContrast, sMask)) * 0.18;
         col *= lumScaled / lum0;
       }
 
-      // Saturação e split-toning estritamente multiplicativo (preserva preto = 0)
+      // Saturação 1.10–1.18 e split-toning (sombra fria azulada, realces quentes)
       float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
       float sat = uSaturation + uWet * 0.03;
       col = max(vec3(0.0), mix(vec3(lum), col, sat));
@@ -700,15 +708,132 @@ export const CinematicGradeShader = {
       col *= max(vec3(0.0), vec3(1.0) + uShadowTint * shadowMask + uHighlightTint * highMask);
 
       // Vinheta sutil e grão cinematográfico leve
-      float vig = 1.0 - smoothstep(0.52, 1.02, dist) * (0.12 + uSpeedNorm * 0.06);
+      float vig = 1.0 - smoothstep(0.55, 1.04, dist) * (0.10 + uSpeedNorm * 0.05);
       col *= vig;
-      float grain = (hashGrain(gl_FragCoord.xy) - 0.5) * 0.0028;
+      float grain = (hashGrain(gl_FragCoord.xy) - 0.5) * 0.0024;
       col = max(col + col * grain, vec3(0.0));
+
+      // Piso suave apenas no toe escuro (lift = 0 acima do toe; impede esmagamento ACES para preto 0)
+      vec3 toeCol = vec3(0.88, 0.98, 1.18) * uToeFloor;
+      col = mix(col, max(col, toeCol), 0.90);
 
       gl_FragColor = vec4(col, 1.0);
     }
   `
 };
+
+// Medidor HDR 16x16 (log-average) para Auto-Exposição física com histerese e suavização
+class AutoExposurePass extends Pass {
+  constructor() {
+    super();
+    this.needsSwap = false;
+    this.desiredKey = 0.108;
+    this.measuredLum = 0.108;
+    this.targetExposure = 0.95;
+    this._lockedLum = 0.108;
+    this.dt = 0.016;
+    this.instantNext = true;
+    this._frame = 0;
+
+    this._meterRT = new THREE.WebGLRenderTarget(16, 16, {
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      format: THREE.RGBAFormat,
+      type: THREE.UnsignedByteType,
+      depthBuffer: false,
+      stencilBuffer: false
+    });
+    this._pixels = new Uint8Array(16 * 16 * 4);
+    this._mat = new THREE.ShaderMaterial({
+      uniforms: { tDiffuse: { value: null } },
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = vec4(position.xy, 0.0, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D tDiffuse;
+        varying vec2 vUv;
+        void main() {
+          vec2 cell = vec2(1.0 / 16.0);
+          vec2 baseUv = vUv - cell * 0.375;
+          float sumLum = 0.0;
+          for (int y = 0; y < 4; y++) {
+            for (int x = 0; x < 4; x++) {
+              vec2 suv = clamp(baseUv + vec2(float(x), float(y)) * (cell * 0.25), vec2(0.002), vec2(0.998));
+              vec3 c = max(texture2D(tDiffuse, suv).rgb, vec3(0.0));
+              sumLum += dot(c, vec3(0.2126, 0.7152, 0.0722));
+            }
+          }
+          float avgCell = max(sumLum * 0.0625, 1e-4);
+          float logNorm = clamp((log2(avgCell) + 10.0) / 16.0, 0.0, 1.0);
+          gl_FragColor = vec4(logNorm, 0.0, 0.0, 1.0);
+        }
+      `
+    });
+    this._fsQuad = new FullScreenQuad(this._mat);
+  }
+
+  render(renderer, writeBuffer, readBuffer) {
+    this._frame++;
+    const shouldSample = this.instantNext || (this._frame % 3 === 0);
+    if (shouldSample && readBuffer && readBuffer.texture) {
+      const prevRT = renderer.getRenderTarget();
+      this._mat.uniforms.tDiffuse.value = readBuffer.texture;
+      renderer.setRenderTarget(this._meterRT);
+      this._fsQuad.render(renderer);
+      renderer.readRenderTargetPixels(this._meterRT, 0, 0, 16, 16, this._pixels);
+      renderer.setRenderTarget(prevRT);
+
+      let wLogSum = 0;
+      let wTotal = 0;
+      for (let py = 0; py < 16; py++) {
+        const ny = (py + 0.5) / 16;
+        // Peso maior na zona pista/carro/horizonte médio (ny <= 0.65) para evitar que céu claro escureça cânion urbano
+        const wy = ny < 0.65 ? 1.0 : 0.45;
+        for (let px = 0; px < 16; px++) {
+          const nx = (px + 0.5) / 16;
+          const dx = nx - 0.5;
+          const w = wy * (1.15 - dx * dx * 0.9);
+          const rByte = this._pixels[(py * 16 + px) * 4];
+          const log2Val = (rByte / 255) * 16.0 - 10.0;
+          wLogSum += log2Val * w;
+          wTotal += w;
+        }
+      }
+      const avgLog2 = wLogSum / Math.max(wTotal, 1e-5);
+      const lum = Math.pow(2, avgLog2);
+      this.measuredLum = lum;
+
+      // Histerese deadband (±3.5% de luminância ou snap instantâneo) para eliminar oscilação
+      const relDiff = Math.abs(lum - this._lockedLum) / Math.max(this._lockedLum, 1e-4);
+      if (this.instantNext || relDiff > 0.035) {
+        this._lockedLum = lum;
+        this.targetExposure = cl(this.desiredKey / Math.max(lum, 1e-3), 0.60, 1.80);
+      }
+    }
+
+    if (this.instantNext || this.dt <= 0) {
+      renderer.toneMappingExposure = this.targetExposure;
+      this.instantNext = false;
+    } else {
+      const tau = 0.95; // 0.8–1.2s adaptação ocular
+      const alpha = 1 - Math.exp(-cl(this.dt, 0.001, 0.08) / tau);
+      renderer.toneMappingExposure = cl(lp(renderer.toneMappingExposure, this.targetExposure, alpha), 0.60, 1.80);
+    }
+  }
+
+  dispose() {
+    this._meterRT.dispose();
+    this._mat.dispose();
+    this._fsQuad.dispose();
+  }
+}
 
 export let composer = null;
 export let renderPass = null;
@@ -716,6 +841,7 @@ export let gtaoPass = null;
 export let bloomPass = null;
 export let gradePass = null;
 export let smaaPass = null;
+export let autoExposurePass = null;
 export let outputPass = null;
 // Alias legado para compatibilidade
 export let forzaPass = null;
@@ -739,7 +865,7 @@ try {
   // GTAO (excluindo sky, dome, clouds, stars, transparências e objetos userData.noAO)
   gtaoPass = new GTAOPass(S, cam, Math.max(1, Math.floor(w0 * 0.5)), Math.max(1, Math.floor(h0 * 0.5)));
   gtaoPass.output = GTAOPass.OUTPUT.Default;
-  gtaoPass.blendIntensity = 0.56;
+  gtaoPass.blendIntensity = 0.48;
   gtaoPass.pdSamples = 10;
   gtaoPass.updateGtaoMaterial({ radius: 0.52, distanceExponent: 1.5, thickness: 1.2, scale: 1.0, samples: 12 });
   gtaoPass._overrideVisibility = function () {
@@ -774,6 +900,9 @@ try {
   smaaPass.enabled = false;
   composer.addPass(smaaPass);
 
+  autoExposurePass = new AutoExposurePass();
+  composer.addPass(autoExposurePass);
+
   outputPass = new OutputPass();
   composer.addPass(outputPass);
 } catch (err) {
@@ -784,6 +913,7 @@ try {
   bloomPass = null;
   gradePass = null;
   smaaPass = null;
+  autoExposurePass = null;
   outputPass = null;
   forzaPass = null;
 }
@@ -818,7 +948,9 @@ export function applyPipelineDebug() {
     light.castShadow = !!debugPipeline.csm && qi > 0;
   });
 
+  const night = set.tod == 5;
   S.environment = debugPipeline.envMap && envT && envT.texture ? envT.texture : null;
+  S.environmentIntensity = debugPipeline.envMap ? (night ? 0.55 : 0.78) : 0.0;
   setToneMappingMode(debugPipeline.toneMapping);
 }
 
@@ -951,39 +1083,39 @@ export function roadTex() {
   const xb = cBmp.getContext('2d');
   const u = o => (o + 9.6) / 19.2 * W;
 
-  xa.fillStyle = '#292e36';
+  xa.fillStyle = '#4e5560';
   xa.fillRect(0, 0, W, H);
-  xr.fillStyle = 'rgb(208,208,208)';
+  xr.fillStyle = 'rgb(202,202,202)';
   xr.fillRect(0, 0, W, H);
   xb.fillStyle = 'rgb(128,128,128)';
   xb.fillRect(0, 0, W, H);
 
   const gL = xa.createLinearGradient(0, 0, u(-8.1), 0);
-  gL.addColorStop(0, '#5a5042');
-  gL.addColorStop(0.62, '#413b33');
-  gL.addColorStop(1, 'rgba(41,46,54,0)');
+  gL.addColorStop(0, '#786c5c');
+  gL.addColorStop(0.62, '#625a4e');
+  gL.addColorStop(1, 'rgba(78,85,96,0)');
   xa.fillStyle = gL;
   xa.fillRect(0, 0, u(-8.1), H);
 
   const gR = xa.createLinearGradient(u(8.1), 0, W, 0);
-  gR.addColorStop(0, 'rgba(41,46,54,0)');
-  gR.addColorStop(0.38, '#413b33');
-  gR.addColorStop(1, '#5a5042');
+  gR.addColorStop(0, 'rgba(78,85,96,0)');
+  gR.addColorStop(0.38, '#625a4e');
+  gR.addColorStop(1, '#786c5c');
   xa.fillStyle = gR;
   xa.fillRect(u(8.1), 0, W - u(8.1), H);
 
-  xr.fillStyle = 'rgb(242,242,242)';
+  xr.fillStyle = 'rgb(236,236,236)';
   xr.fillRect(0, 0, u(-8.3), H);
   xr.fillRect(u(8.3), 0, W - u(8.3), H);
 
-  // Micro-agregado fino (sem blocos quadriculados/pixelados no ângulo raso atrás do carro)
+  // Micro-agregado fino (albedo ~0.08 linear para asfalto legível ao sol e na sombra)
   for (let i = 0; i < 48000; i++) {
     const px = Math.random() * W;
     const py = Math.random() * H;
     const sw = 0.8 + Math.random() * 0.9;
     const sh = 0.8 + Math.random() * 0.9;
-    const tone = 39 + (Math.random() * 10 | 0);
-    const hi = Math.random() < 0.08 ? 5 : 0;
+    const tone = 70 + (Math.random() * 18 | 0);
+    const hi = Math.random() < 0.09 ? 7 : 0;
     const v = tone + hi;
     xa.fillStyle = `rgb(${v},${v + 2},${v + 5})`;
     xa.fillRect(px, py, sw, sh);
@@ -992,7 +1124,7 @@ export function roadTex() {
     xb.fillStyle = `rgb(${b},${b},${b})`;
     xb.fillRect(px, py, sw, sh);
 
-    const r = 194 + (Math.random() * 24 | 0);
+    const r = 188 + (Math.random() * 24 | 0);
     xr.fillStyle = `rgb(${r},${r},${r})`;
     xr.fillRect(px, py, sw, sh);
   }
@@ -1002,9 +1134,9 @@ export function roadTex() {
     const py = Math.random() * H;
     const rw = 32 + Math.random() * 80;
     const rh = 48 + Math.random() * 150;
-    xa.fillStyle = i % 2 ? 'rgba(58,64,74,0.14)' : 'rgba(18,21,26,0.20)';
+    xa.fillStyle = i % 2 ? 'rgba(96,104,116,0.16)' : 'rgba(52,58,66,0.20)';
     xa.fillRect(px, py, rw, rh);
-    xr.fillStyle = i % 2 ? 'rgba(176,176,176,0.22)' : 'rgba(144,144,144,0.26)';
+    xr.fillStyle = i % 2 ? 'rgba(174,174,174,0.22)' : 'rgba(144,144,144,0.26)';
     xr.fillRect(px, py, rw, rh);
   }
 
@@ -1143,9 +1275,9 @@ const roadM = setupMaterialPipeline(
     bumpMap: rMaps.bumpMap,
     bumpScale: 0.008,
     roughnessMap: rMaps.roughnessMap,
-    roughness: 0.76,
+    roughness: 0.74,
     metalness: 0.0,
-    envMapIntensity: 0.28
+    envMapIntensity: 0.50
   }),
   null,
   'road'
@@ -1162,9 +1294,9 @@ const groundM = new THREE.MeshStandardMaterial({
   vertexColors: true,
   bumpMap: tTex,
   bumpScale: 0.24,
-  roughness: 0.94,
+  roughness: 0.90,
   metalness: 0.0,
-  envMapIntensity: 0.10
+  envMapIntensity: 0.48
 });
 
 const applyTerrainShader = shader => {
@@ -1690,36 +1822,56 @@ export function barkTex() {
   return t;
 }
 
-// Textura procedural reflexiva de fachadas de arranha-céus (janelas diurnas + brilho noturno)
+// Textura procedural arquitetônica de fachadas (pilares/concreto fosco + vidros que refletem o céu de dia e acendem à noite)
 function skyscraperTex() {
   const W = 256;
   const H = 512;
   const cAlb = document.createElement('canvas');
   const cEm = document.createElement('canvas');
-  cAlb.width = cEm.width = W;
-  cAlb.height = cEm.height = H;
+  const cRgh = document.createElement('canvas');
+  const cMet = document.createElement('canvas');
+  cAlb.width = cEm.width = cRgh.width = cMet.width = W;
+  cAlb.height = cEm.height = cRgh.height = cMet.height = H;
   const xa = cAlb.getContext('2d');
   const xe = cEm.getContext('2d');
+  const xr = cRgh.getContext('2d');
+  const xm = cMet.getContext('2d');
 
-  xa.fillStyle = '#253242';
+  // Concreto/pedra estrutural dessaturado (modulado por instanceColor)
+  xa.fillStyle = '#c4c0b8';
   xa.fillRect(0, 0, W, H);
   xe.fillStyle = '#000000';
   xe.fillRect(0, 0, W, H);
+  xr.fillStyle = 'rgb(216,216,216)';
+  xr.fillRect(0, 0, W, H);
+  xm.fillStyle = 'rgb(18,18,18)';
+  xm.fillRect(0, 0, W, H);
 
   const cols = 8;
   const rowsCnt = 24;
   const cw = W / cols;
   const ch = H / rowsCnt;
   for (let r = 0; r < rowsCnt; r++) {
+    // Faixa de laje entre andares
+    xa.fillStyle = '#a4a098';
+    xa.fillRect(0, r * ch, W, 3);
+
     for (let c = 0; c < cols; c++) {
       const px = c * cw + 4;
       const py = r * ch + 4;
       const ww = cw - 8;
       const wh = ch - 7;
       const rndVal = rnd(c, r, 41);
-      const glassTone = rndVal < 0.35 ? '#486684' : (rndVal < 0.7 ? '#344c66' : '#587898');
+      // Vidros arquitetônicos com tons variados de azul-ardósia/grafite que refletem o céu via IBL
+      const glassTone = rndVal < 0.34 ? '#4a6076' : (rndVal < 0.68 ? '#384c60' : '#5b7288');
       xa.fillStyle = glassTone;
       xa.fillRect(px, py, ww, wh);
+
+      // Vidro liso altamente reflexivo (roughness ~0.09, metalness ~0.65)
+      xr.fillStyle = 'rgb(22,22,22)';
+      xr.fillRect(px, py, ww, wh);
+      xm.fillStyle = 'rgb(166,166,166)';
+      xm.fillRect(px, py, ww, wh);
 
       if (rndVal > 0.38) {
         const warm = rnd(c, r, 73) < 0.72;
@@ -1727,15 +1879,17 @@ function skyscraperTex() {
         xe.fillRect(px + 1, py + 1, ww - 2, wh - 2);
       }
     }
-    xa.fillStyle = '#1b222c';
-    xa.fillRect(0, r * ch, W, 3);
   }
 
   const map = prepTex(new THREE.CanvasTexture(cAlb), true);
   map.wrapS = map.wrapT = THREE.RepeatWrapping;
   const emissiveMap = prepTex(new THREE.CanvasTexture(cEm), true);
   emissiveMap.wrapS = emissiveMap.wrapT = THREE.RepeatWrapping;
-  return { map, emissiveMap };
+  const roughnessMap = prepTex(new THREE.CanvasTexture(cRgh), false);
+  roughnessMap.wrapS = roughnessMap.wrapT = THREE.RepeatWrapping;
+  const metalnessMap = prepTex(new THREE.CanvasTexture(cMet), false);
+  metalnessMap.wrapS = metalnessMap.wrapT = THREE.RepeatWrapping;
+  return { map, emissiveMap, roughnessMap, metalnessMap };
 }
 
 function lightPoolTex() {
@@ -2204,20 +2358,22 @@ export function rebuildBiome(biomeIdx = set.biome) {
   const trunkMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({
     map: barkT,
     color: bIdx === 3 ? 0xc2b2b4 : 0xffffff,
-    roughness: 0.92,
+    roughness: 0.90,
     metalness: 0.0,
-    envMapIntensity: 0.14
+    envMapIntensity: 0.45
   })), null, 'biome_std');
 
   const bollardBodyMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({
     color: bIdx === 4 ? 0xeb8434 : 0xd8dce2,
-    roughness: 0.45
+    roughness: 0.45,
+    envMapIntensity: 0.65
   })), null, 'biome_std');
   const catReflectorMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({
     color: 0xffd2a0,
     emissive: 0xff9429,
     emissiveIntensity: 1.4,
-    roughness: 0.25
+    roughness: 0.25,
+    envMapIntensity: 0.75
   })), null, 'biome_std');
   biomeEmissives.catReflectorMat = catReflectorMat;
 
@@ -2225,7 +2381,8 @@ export function rebuildBiome(biomeIdx = set.biome) {
     color: bIdx === 2 ? 0x15528a : 0x1b6b3a,
     emissive: bIdx === 2 ? 0x267ec9 : 0x2ca85a,
     emissiveIntensity: 0.55,
-    roughness: 0.35
+    roughness: 0.35,
+    envMapIntensity: 0.65
   })), null, 'biome_std');
   biomeEmissives.kmSignMat = kmSignMat;
 
@@ -2258,7 +2415,7 @@ export function rebuildBiome(biomeIdx = set.biome) {
   // Barreiras laterais adaptadas (New Jersey na Cidade, W-Beam nos demais)
   if (bIdx === 2) {
     const njGeo = trackGeo(buildNewJerseyBarrierGeo(6.0));
-    const njMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ color: 0x767d87, roughness: 0.88, metalness: 0.05 })), null, 'biome_std');
+    const njMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ color: 0x90959c, roughness: 0.84, metalness: 0.04, envMapIntensity: 0.60 })), null, 'biome_std');
     inst(njGeo, njMat, 240, 720, (obj, i, k, z) => {
       const s = i % 2 ? 1 : -1;
       obj.position.set(cx(z) + s * 9.95, ry(z), z);
@@ -2267,9 +2424,10 @@ export function rebuildBiome(biomeIdx = set.biome) {
   } else {
     const railGeo = trackGeo(buildMergedGuardrailGeo(6.0));
     const railMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({
-      color: bIdx === 1 ? 0x8f6b4b : 0xa4abb5,
+      color: bIdx === 1 ? 0x9c7656 : 0xaab1bb,
       metalness: bIdx === 1 ? 0.35 : 0.78,
-      roughness: bIdx === 1 ? 0.65 : 0.32
+      roughness: bIdx === 1 ? 0.65 : 0.32,
+      envMapIntensity: 0.78
     })), null, 'biome_std');
     inst(railGeo, railMat, 240, 720, (obj, i, k, z) => {
       if (!isGuardRailZone(z)) { obj.scale.setScalar(0); return; }
@@ -2295,20 +2453,20 @@ export function rebuildBiome(biomeIdx = set.biome) {
 
     const pineMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({
       map: pineLeafT, alphaTest: useA2C ? 0.28 : 0.42, alphaToCoverage: useA2C,
-      side: THREE.DoubleSide, roughness: 0.84, envMapIntensity: 0.12
+      side: THREE.DoubleSide, roughness: 0.82, envMapIntensity: 0.36
     })), null, 'biome_fol');
     const broadMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({
       map: broadLeafT, alphaTest: useA2C ? 0.28 : 0.42, alphaToCoverage: useA2C,
-      side: THREE.DoubleSide, roughness: 0.82, envMapIntensity: 0.12
+      side: THREE.DoubleSide, roughness: 0.80, envMapIntensity: 0.36
     })), null, 'biome_fol');
     const grassMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({
       map: grassTuftT, alphaTest: useA2C ? 0.24 : 0.36, alphaToCoverage: useA2C,
-      side: THREE.DoubleSide, roughness: 0.92, envMapIntensity: 0.10
+      side: THREE.DoubleSide, roughness: 0.90, envMapIntensity: 0.32
     })), null, 'biome_fol');
-    const rockMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ map: rockT, color: 0xffffff, roughness: 0.92 })), null, 'biome_std');
-    const houseWallM = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ color: 0xd8cfc0, roughness: 0.88 })), null, 'biome_std');
-    const houseRoofM = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ color: 0x7d3a27, roughness: 0.82 })), null, 'biome_std');
-    const houseWinM = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ color: 0x263242, emissive: 0xffb85c, emissiveIntensity: 0, roughness: 0.25 })), null, 'biome_std');
+    const rockMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ map: rockT, color: 0xffffff, roughness: 0.88, envMapIntensity: 0.62 })), null, 'biome_std');
+    const houseWallM = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ color: 0xd8cfc0, roughness: 0.86, envMapIntensity: 0.62 })), null, 'biome_std');
+    const houseRoofM = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ color: 0x86422f, roughness: 0.80, envMapIntensity: 0.62 })), null, 'biome_std');
+    const houseWinM = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ color: 0x384b60, emissive: 0xffb85c, emissiveIntensity: 0, roughness: 0.16, metalness: 0.45, envMapIntensity: 1.05 })), null, 'biome_std');
     biomeEmissives.houseWinM = houseWinM;
 
     inst(pineCrownGeo, pineMat, 220, 1150, (obj, i, k, z, m) => {
@@ -2399,12 +2557,12 @@ export function rebuildBiome(biomeIdx = set.biome) {
     const saguaroGeo = trackGeo(buildSaguaroGeo());
     const shrubGeo = trackGeo(buildGrassClumpGeo());
     const rockGeo = trackGeo(buildOrganicRockGeo());
-    const cactusMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ color: 0x4b7440, roughness: 0.84, metalness: 0.0 })), null, 'biome_std');
+    const cactusMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ color: 0x4b7440, roughness: 0.84, metalness: 0.0, envMapIntensity: 0.58 })), null, 'biome_std');
     const shrubMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({
       map: grassTuftT, alphaTest: useA2C ? 0.24 : 0.36, alphaToCoverage: useA2C,
-      side: THREE.DoubleSide, roughness: 0.92
+      side: THREE.DoubleSide, roughness: 0.90, envMapIntensity: 0.32
     })), null, 'biome_fol');
-    const canyonRockMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ map: rockT, color: 0xc2774a, roughness: 0.90 })), null, 'biome_std');
+    const canyonRockMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ map: rockT, color: 0xc2774a, roughness: 0.88, envMapIntensity: 0.62 })), null, 'biome_std');
 
     inst(saguaroGeo, cactusMat, 260, 1150, (obj, i, k, z, m) => {
       const r1 = rnd(i, k, 21);
@@ -2459,18 +2617,20 @@ export function rebuildBiome(biomeIdx = set.biome) {
 
     const skyscraperMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({
       map: skyScrTex.map,
+      roughnessMap: skyScrTex.roughnessMap,
+      metalnessMap: skyScrTex.metalnessMap,
       emissive: 0xffffff,
       emissiveMap: skyScrTex.emissiveMap,
-      emissiveIntensity: 0.08,
-      roughness: 0.34,
-      metalness: 0.38,
-      envMapIntensity: 0.48
+      emissiveIntensity: 0.0,
+      roughness: 1.0,
+      metalness: 1.0,
+      envMapIntensity: 1.15
     })), null, 'biome_std');
     const towerCrownMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({
-      color: 0x38424d,
-      roughness: 0.50,
-      metalness: 0.45,
-      envMapIntensity: 0.35
+      color: 0x7c828b,
+      roughness: 0.62,
+      metalness: 0.28,
+      envMapIntensity: 0.68
     })), null, 'biome_std');
     biomeEmissives.skyscraperBodyM = skyscraperMat;
 
@@ -2489,10 +2649,13 @@ export function rebuildBiome(biomeIdx = set.biome) {
       obj.scale.set(w, bh, d);
       obj.rotation.y = Math.atan2(cx(z - 6) - cx(z + 6), -12);
       if (m && m.setColorAt) {
+        // Tons arquitetônicos dessaturados e variados (calcário, concreto claro, ardósia, arenito, grafite-bronze)
         const tint = rnd(i, k, 57);
-        if (tint < 0.33) m.setColorAt(i, colr.setHex(0x88a8c8));
-        else if (tint < 0.66) m.setColorAt(i, colr.setHex(0x9cb4c8));
-        else m.setColorAt(i, colr.setHex(0x6e8296));
+        if (tint < 0.20) m.setColorAt(i, colr.setHex(0xd8d2c8));
+        else if (tint < 0.42) m.setColorAt(i, colr.setHex(0xc4c7cc));
+        else if (tint < 0.64) m.setColorAt(i, colr.setHex(0xa2aab4));
+        else if (tint < 0.84) m.setColorAt(i, colr.setHex(0xc0b5a6));
+        else m.setColorAt(i, colr.setHex(0x888d95));
       }
     };
     inst(towerBodyGeo, skyscraperMat, 160, 1280, towerTransform, true, null, 140, true);
@@ -2503,7 +2666,7 @@ export function rebuildBiome(biomeIdx = set.biome) {
     trackGeo(lampParts.pole);
     trackGeo(lampParts.bulb);
     trackGeo(lampParts.pool);
-    const poleMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ color: 0x454e59, metalness: 0.80, roughness: 0.30 })), null, 'biome_std');
+    const poleMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ color: 0x5c6672, metalness: 0.80, roughness: 0.28, envMapIntensity: 0.85 })), null, 'biome_std');
     const bulbMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({
       color: 0xffcf87,
       emissive: 0xffcf87,
@@ -2537,12 +2700,13 @@ export function rebuildBiome(biomeIdx = set.biome) {
     const gantryParts = buildGantryParts();
     trackGeo(gantryParts.frame);
     trackGeo(gantryParts.signs);
-    const gantryFrameMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ color: 0x626b75, metalness: 0.72, roughness: 0.36 })), null, 'biome_std');
+    const gantryFrameMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ color: 0x6c7580, metalness: 0.72, roughness: 0.34, envMapIntensity: 0.82 })), null, 'biome_std');
     const gantrySignMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({
       color: 0x165e3a,
       emissive: 0x269e60,
       emissiveIntensity: 0.25,
-      roughness: 0.35
+      roughness: 0.35,
+      envMapIntensity: 0.65
     })), null, 'biome_std');
     biomeEmissives.gantrySignM = gantrySignMat;
 
@@ -2558,7 +2722,7 @@ export function rebuildBiome(biomeIdx = set.biome) {
     const broadTrunkGeo = trackGeo(buildOrganicTrunk(4.0, 0.32, 0.15, 4));
     const broadMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({
       map: broadLeafT, alphaTest: useA2C ? 0.28 : 0.42, alphaToCoverage: useA2C,
-      side: THREE.DoubleSide, roughness: 0.80
+      side: THREE.DoubleSide, roughness: 0.80, envMapIntensity: 0.36
     })), null, 'biome_fol');
     inst(broadCrownGeo, broadMat, 90, 1150, (obj, i, k, z, m) => {
       const p = treePos(i, k, z, 63, 0.65, 13.5, 16);
@@ -2591,14 +2755,14 @@ export function rebuildBiome(biomeIdx = set.biome) {
 
     const sakuraMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({
       map: sakuraLeafT, alphaTest: useA2C ? 0.26 : 0.40, alphaToCoverage: useA2C,
-      side: THREE.DoubleSide, roughness: 0.80, envMapIntensity: 0.12
+      side: THREE.DoubleSide, roughness: 0.78, envMapIntensity: 0.36
     })), null, 'biome_fol');
     const grassMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({
       map: grassTuftT, alphaTest: useA2C ? 0.24 : 0.36, alphaToCoverage: useA2C,
-      side: THREE.DoubleSide, roughness: 0.92, envMapIntensity: 0.10
+      side: THREE.DoubleSide, roughness: 0.90, envMapIntensity: 0.32
     })), null, 'biome_fol');
-    const toriiRedMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ color: 0xc82a24, roughness: 0.42, metalness: 0.08 })), null, 'biome_std');
-    const shrineStoneMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ map: rockT, color: 0x7e838a, roughness: 0.88 })), null, 'biome_std');
+    const toriiRedMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ color: 0xc82a24, roughness: 0.42, metalness: 0.08, envMapIntensity: 0.68 })), null, 'biome_std');
+    const shrineStoneMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ map: rockT, color: 0x8a8f96, roughness: 0.86, envMapIntensity: 0.62 })), null, 'biome_std');
     const lanternFlameMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({
       color: 0xffd08a, emissive: 0xffa640, emissiveIntensity: 1.5, roughness: 0.3
     })), null, 'biome_std');
@@ -2682,12 +2846,12 @@ export function rebuildBiome(biomeIdx = set.biome) {
 
     const snowPineMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({
       map: snowPineLeafT, alphaTest: useA2C ? 0.28 : 0.42, alphaToCoverage: useA2C,
-      side: THREE.DoubleSide, roughness: 0.86, envMapIntensity: 0.12
+      side: THREE.DoubleSide, roughness: 0.84, envMapIntensity: 0.36
     })), null, 'biome_fol');
-    const snowRockMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ map: rockT, color: 0x9aa6b4, roughness: 0.88, envMapIntensity: 0.15 })), null, 'biome_std');
-    const chaletWallM = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ color: 0x5c4332, roughness: 0.88 })), null, 'biome_std');
-    const chaletRoofM = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ color: 0x96a4b4, roughness: 0.84 })), null, 'biome_std');
-    const chaletWinM = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ color: 0x263242, emissive: 0xffb85c, emissiveIntensity: 0.35, roughness: 0.25 })), null, 'biome_std');
+    const snowRockMat = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ map: rockT, color: 0xa2aebc, roughness: 0.86, envMapIntensity: 0.62 })), null, 'biome_std');
+    const chaletWallM = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ color: 0x6e513e, roughness: 0.86, envMapIntensity: 0.62 })), null, 'biome_std');
+    const chaletRoofM = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ color: 0x9aa8b8, roughness: 0.82, envMapIntensity: 0.62 })), null, 'biome_std');
+    const chaletWinM = setupMaterialPipeline(trackMat(new THREE.MeshStandardMaterial({ color: 0x384b60, emissive: 0xffb85c, emissiveIntensity: 0.35, roughness: 0.16, metalness: 0.45, envMapIntensity: 1.05 })), null, 'biome_std');
     biomeEmissives.houseWinM = chaletWinM;
 
     inst(pineCrownGeo, snowPineMat, 280, 1150, (obj, i, k, z, m) => {
@@ -2830,12 +2994,17 @@ export function rainUpd(dt) {
 }
 
 const _sunProjVec = new THREE.Vector3();
-let targetAutoExposure = 0.85;
+let targetFallbackExposure = 0.95;
 let starNightBaseOpacity = 0;
 
-export function updateAutoExposure(dt = 0.016) {
-  const blend = dt > 0 ? 1 - Math.exp(-3.2 * cl(dt, 0.001, 0.05)) : 1;
-  R.toneMappingExposure = cl(lp(R.toneMappingExposure, targetAutoExposure, blend), 0.72, 1.24);
+export function updateAutoExposure(dt = 0.016, instant = false) {
+  if (autoExposurePass) {
+    autoExposurePass.dt = dt;
+    if (instant) autoExposurePass.instantNext = true;
+    return;
+  }
+  const blend = !instant && dt > 0 ? 1 - Math.exp(-cl(dt, 0.001, 0.08) / 0.95) : 1;
+  R.toneMappingExposure = cl(lp(R.toneMappingExposure, targetFallbackExposure, blend), 0.60, 1.80);
 }
 
 export function updateSkyPos(camPos, timeSec) {
@@ -2857,7 +3026,7 @@ export function updateSkyPos(camPos, timeSec) {
 }
 
 export function renderWorld(timeSec = 0, speedKmh = 0, lateralG = 0, isWet = false, dt = 0.016) {
-  updateAutoExposure(dt);
+  updateAutoExposure(dt, dt <= 0);
 
   const useComposer = !!(composer && (set.q >= 1 || debugPipeline.gtao || debugPipeline.bloom || debugPipeline.grade || debugPipeline.smaa));
   if (useComposer && gradePass) {
@@ -2892,12 +3061,15 @@ export function onEnvChange(fn) {
 
 export function envUpdate() {
   const o = envT;
+  const night = set.tod == 5;
   try {
     envT = PM.fromScene(ES, 0.03);
     S.environment = debugPipeline.envMap && envT && envT.texture ? envT.texture : null;
+    S.environmentIntensity = debugPipeline.envMap ? (night ? 0.55 : 0.78) : 0.0;
   } catch {
     envT = null;
     S.environment = null;
+    S.environmentIntensity = 0.0;
   }
   if (o) o.dispose();
 }
@@ -2950,25 +3122,46 @@ export function applyEnv(instantExposure = false) {
   cloudMat.uniforms.uCoverage.value = [0.36, 0.26, 0.74, 0.86][set.wx];
   cloudMat.uniforms.uNight.value = night ? 1.0 : 0.0;
 
-  // Luz direcional física via CSM (key/fill forte para contraste nítido e sombras projetadas)
-  const wxAtten = [1, 0.66, 0.50, 0.44][set.wx];
-  const daySun = night ? 0.62 : (set.tod == 4 ? Math.max(2.15, si * 0.90) : si);
+  // Luz direcional física via CSM (razão sol:preenchimento ~3.3–4.0:1 de dia, sombras 0.55–0.68 sem esmagar)
+  const wxAtten = [1, 0.68, 0.52, 0.46][set.wx];
+  const daySun = night ? 0.62 : (set.tod == 4 ? Math.max(2.05, si * 0.92) : si);
   const sunFinalIntensity = daySun * wxAtten;
   const sunCol = new THREE.Color(night ? 0x9bb6f5 : 0xfff4e0).lerp(new THREE.Color(sc), lowSun ? 0.55 : 0.12);
   csm.lightIntensity = sunFinalIntensity;
   csm.lightDirection.copy(sdir).negate();
+  const shadowDensity = night ? 0.55 : lp(0.66, 0.52, g);
   csm.lights.forEach((light, idx) => {
     light.color.copy(sunCol);
     light.intensity = sunFinalIntensity;
+    if (light.shadow) {
+      light.shadow.intensity = shadowDensity;
+      light.shadow.radius = 2.2;
+    }
     light.visible = set.q === 0 ? idx === 0 : true;
     light.castShadow = !!debugPipeline.csm && set.q > 0;
   });
 
-  hemi.color.set(bm.skyHor).lerp(Tc, night ? 0.68 : 0.40);
-  hemi.groundColor.set(bm.groundCol).multiplyScalar(0.85);
-  const baseHemi = hi ?? (night ? 0.14 : 0.24);
-  hemi.intensity = Math.max(0.11, baseHemi * (1 - 0.10 * g));
-  amb.intensity = night ? 0.04 : 0.03;
+  // Preenchimento hemisférico + bounce quente do solo + ambiente base
+  hemi.color.set(bm.skyHor).lerp(Tc, night ? 0.65 : 0.35);
+  hemi.groundColor
+    .set(bm.groundCol)
+    .lerp(new THREE.Color(0x584d40), night ? 0.12 : (bm.id === 'snow' ? 0.12 : 0.35))
+    .multiplyScalar(night ? 0.55 : 0.96);
+  const baseHemi = hi ?? (night ? 0.22 : 0.90);
+  hemi.intensity = Math.max(0.18, baseHemi * (1 - 0.16 * g));
+  amb.intensity = night ? 0.045 : lp(0.10, 0.12, g);
+
+  // Luz barata de bounce em cânion urbano (ativa somente na Cidade, sem sombras)
+  const isCity = bm.id === 'city';
+  cityBounceLight.visible = isCity;
+  if (isCity) {
+    const oppX = -(Math.sign(sdir.x) || 1);
+    cityBounceLight.position.set(oppX * 1.15, 0.52, 0.38);
+    cityBounceLight.color.set(night ? 0x6c82a8 : (lowSun ? 0xe0bd96 : 0xdccbb4));
+    cityBounceLight.intensity = night ? 0.18 : lp(0.62, 0.36, g);
+  } else {
+    cityBounceLight.intensity = 0.0;
+  }
 
   if (esSky.material && esSky.material.uniforms) {
     esSky.visible = !night;
@@ -2983,11 +3176,11 @@ export function applyEnv(instantExposure = false) {
   }
   esSkyMat.color.copy(Tc).lerp(H, 0.45);
   if (night) esSkyMat.color.lerp(new THREE.Color(0x1b263d), 0.6);
-  esGroundMat.color.set(bm.groundCol).multiplyScalar(0.55);
+  esGroundMat.color.set(bm.groundCol).multiplyScalar(0.88);
   esSunDisc.position.copy(sdir).multiplyScalar(32);
-  esSunMat.color.set(night ? 0xaec6ff : sc).multiplyScalar(night ? 0.45 : 1.05);
+  esSunMat.color.set(night ? 0xaec6ff : sc).multiplyScalar(night ? 0.55 : 1.35);
 
-  const fogTintScale = night ? 0.85 : lp(0.62, 0.78, g);
+  const fogTintScale = night ? 0.85 : lp(0.64, 0.80, g);
   S.fog.color.copy(H).multiplyScalar(fogTintScale);
   const baseFog = bm.fogDensity || 0.00028;
   S.fog.density = [baseFog, 0.0016, 0.00072, 0.00118][set.wx];
@@ -3000,19 +3193,25 @@ export function applyEnv(instantExposure = false) {
   starNightBaseOpacity = night ? 1 - g * 0.65 : 0;
   stars.material.opacity = starNightBaseOpacity;
 
-  // Exposição alvo calibrada para ACESFilmic (luminância média 0.22..0.50, contraste >= 6, sem estouro)
-  const snowDamp = bm.id === 'snow' ? 0.86 : (bm.id === 'desert' ? 0.94 : 1.0);
-  const todExp = [0.88, 0.84, 0.88, 0.92, 0.98, 1.12][set.tod];
-  const wxExp = [1.0, 1.02, 1.06, 1.04][set.wx];
-  targetAutoExposure = cl(todExp * wxExp * snowDamp, 0.72, 1.24);
-  if (instantExposure) R.toneMappingExposure = targetAutoExposure;
+  // Auto-exposição HDR medida por luminância log-média (1/16) com key calibrado por horário/bioma
+  const snowDamp = bm.id === 'snow' ? 0.90 : (bm.id === 'desert' ? 0.96 : 1.0);
+  const keyTarget = (night ? 0.048 : (set.tod === 4 ? 0.090 : (lowSun ? 0.100 : 0.110))) * snowDamp;
+  if (autoExposurePass) {
+    autoExposurePass.desiredKey = keyTarget;
+    if (instantExposure) autoExposurePass.instantNext = true;
+  }
+  const todExp = [0.98, 0.94, 0.98, 1.02, 1.08, 1.24][set.tod];
+  const wxExp = [1.0, 1.04, 1.08, 1.06][set.wx];
+  targetFallbackExposure = cl(todExp * wxExp * snowDamp, 0.60, 1.80);
+  if (instantExposure && !autoExposurePass) R.toneMappingExposure = targetFallbackExposure;
 
   if (gradePass && gradePass.uniforms) {
     const gu = gradePass.uniforms;
     gu.uSunShaftColor.value.copy(sunCol);
     gu.uSunShaftStrength.value = night ? 0.0 : (lowSun ? 0.075 : 0.045);
-    gu.uSaturation.value = night ? 1.08 : (lowSun ? 1.17 : 1.14);
-    gu.uContrast.value = night ? 1.05 : 1.09;
+    gu.uSaturation.value = night ? 1.10 : (lowSun ? 1.16 : 1.14);
+    gu.uContrast.value = night ? 1.04 : 1.08;
+    gu.uToeFloor.value = night ? 0.0055 : 0.0115;
     if (night) {
       gu.uShadowTint.value.set(-0.02, 0.0, 0.045);
       gu.uHighlightTint.value.set(0.01, 0.018, 0.032);
@@ -3020,13 +3219,13 @@ export function applyEnv(instantExposure = false) {
       gu.uShadowTint.value.set(-0.015, 0.0, 0.032);
       gu.uHighlightTint.value.set(0.028, 0.014, -0.016);
     } else {
-      gu.uShadowTint.value.set(-0.024, 0.0, 0.036);
-      gu.uHighlightTint.value.set(0.016, 0.008, -0.010);
+      gu.uShadowTint.value.set(-0.022, 0.0, 0.038);
+      gu.uHighlightTint.value.set(0.018, 0.009, -0.010);
     }
   }
 
   if (biomeEmissives.houseWinM) {
-    biomeEmissives.houseWinM.emissiveIntensity = night ? 1.85 : (lowSun || bm.id === 'snow' ? 0.25 : 0);
+    biomeEmissives.houseWinM.emissiveIntensity = night ? 1.85 : (set.tod === 4 ? 0.45 : 0.0);
   }
   if (biomeEmissives.catReflectorMat) {
     biomeEmissives.catReflectorMat.emissiveIntensity = night ? 2.8 : (lowSun ? 1.3 : 0.55);
@@ -3035,7 +3234,7 @@ export function applyEnv(instantExposure = false) {
     biomeEmissives.kmSignMat.emissiveIntensity = night ? 0.95 : 0.22;
   }
   if (biomeEmissives.skyscraperBodyM) {
-    biomeEmissives.skyscraperBodyM.emissiveIntensity = night ? 1.45 : (lowSun ? 0.35 : 0.06);
+    biomeEmissives.skyscraperBodyM.emissiveIntensity = night ? 1.45 : (set.tod === 4 ? 0.45 : 0.0);
   }
   if (biomeEmissives.streetlightBulbM) {
     biomeEmissives.streetlightBulbM.emissiveIntensity = night ? 2.8 : (lowSun ? 1.1 : 0.12);
@@ -3068,9 +3267,9 @@ export function applyEnv(instantExposure = false) {
   const wet = set.wx == 3;
   const snowyRoad = bm.id === 'snow';
   terrainUniforms.uWetTerrain.value = wet ? 1.0 : 0.0;
-  roadM.roughness = wet ? 0.24 : (snowyRoad ? 0.50 : (bm.id === 'desert' ? 0.84 : 0.76));
+  roadM.roughness = wet ? 0.24 : (snowyRoad ? 0.50 : (bm.id === 'desert' ? 0.82 : 0.74));
   roadM.metalness = 0.0;
-  roadM.envMapIntensity = wet ? 0.72 : (snowyRoad ? 0.36 : (bm.id === 'city' ? 0.34 : 0.26));
+  roadM.envMapIntensity = wet ? 0.85 : (snowyRoad ? 0.54 : (bm.id === 'city' ? 0.54 : 0.46));
   roadM.color.set(wet ? 0xc2cad6 : (bm.id === 'desert' ? 0xe6dacb : (snowyRoad ? 0xc2cbd6 : 0xf4f5f7)));
 
   rain.visible = wet;

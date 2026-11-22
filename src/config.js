@@ -43,9 +43,9 @@ export const BIOMES = [
     desc: 'Colinas verde-esmeralda, pinheiros e céu sereno',
     gripMul: 1.0,
     skyTop: 0x35649e,
-    skyHor: 0x769ec4,
-    groundCol: 0x1d2b14,
-    fogDensity: 0.00026,
+    skyHor: 0x7aa2c8,
+    groundCol: 0x3e4b2e,
+    fogDensity: 0.00024,
     particle: 'none',
     accent: '#63b87b'
   },
@@ -56,9 +56,9 @@ export const BIOMES = [
     desc: 'Dunas onduladas, cânions terracota e cactos saguaro',
     gripMul: 0.96,
     skyTop: 0x376298,
-    skyHor: 0xb98d62,
-    groundCol: 0x52321b,
-    fogDensity: 0.00032,
+    skyHor: 0xbe9268,
+    groundCol: 0x7a5233,
+    fogDensity: 0.00030,
     particle: 'dust',
     accent: '#e0914c'
   },
@@ -68,10 +68,10 @@ export const BIOMES = [
     short: 'CIDADE / METRÓPOLE',
     desc: 'Via expressa urbana, arranha-céus e postes a cada 35m',
     gripMul: 1.03,
-    skyTop: 0x325885,
-    skyHor: 0x728aa3,
-    groundCol: 0x171d24,
-    fogDensity: 0.00042,
+    skyTop: 0x365e8e,
+    skyHor: 0x7c95ae,
+    groundCol: 0x4b4741,
+    fogDensity: 0.00038,
     particle: 'none',
     accent: '#5caeff'
   },
@@ -82,9 +82,9 @@ export const BIOMES = [
     desc: 'Cerejeiras em flor, portais Torii e Monte Fuji',
     gripMul: 1.0,
     skyTop: 0x38669c,
-    skyHor: 0x91a7be,
-    groundCol: 0x222d1c,
-    fogDensity: 0.00028,
+    skyHor: 0x95abc2,
+    groundCol: 0x424a38,
+    fogDensity: 0.00026,
     particle: 'sakura',
     accent: '#ee8fab'
   },
@@ -94,23 +94,23 @@ export const BIOMES = [
     short: 'MONTANHAS NEVADAS',
     desc: 'Passo alpino invernal com neve macia e flocos no ar',
     gripMul: 0.88,
-    skyTop: 0x345b87,
-    skyHor: 0x899eb3,
-    groundCol: 0x45515e,
-    fogDensity: 0.00034,
+    skyTop: 0x365e8c,
+    skyHor: 0x8da2b8,
+    groundCol: 0x5c6a78,
+    fogDensity: 0.00032,
     particle: 'snow',
     accent: '#8cbde8'
   }
 ];
 
-// ---------- presets de horário e atmosfera (contraste cinematográfico, sol lateral 3/4 de dia)
+// ---------- presets de horário e atmosfera (razão sol:preenchimento ~3.3:1–4.0:1 de dia)
 export const TOD = [
-  ['Manhã', 0x37649b, 0xb2987b, 0.34, 1.88, 0xffd5a4, 3.35, 0.24],
-  ['Meio-dia', 0x3564a0, 0x7da4cc, 0.88, 1.95, 0xfff3de, 3.65, 0.25],
-  ['Fim de tarde', 0x325b91, 0xc2956b, 0.46, 2.02, 0xffc688, 3.25, 0.23],
-  ['Golden hour', 0x2f4b7a, 0xc8844c, 0.24, 2.25, 0xff9e4a, 2.95, 0.20],
-  ['Pôr do sol', 0x1e2952, 0xbb6942, 0.11, 2.58, 0xff7040, 2.35, 0.17],
-  ['Noite', 0x09101c, 0x111a2b, 0.48, 3.8, 0x89a6ff, 0.62, 0.14]
+  ['Manhã', 0x37649b, 0xb2987b, 0.34, 1.88, 0xffd5a4, 3.25, 0.86],
+  ['Meio-dia', 0x3564a0, 0x7da4cc, 0.88, 1.95, 0xfff3de, 3.45, 0.95],
+  ['Fim de tarde', 0x325b91, 0xc2956b, 0.46, 2.02, 0xffc688, 3.15, 0.84],
+  ['Golden hour', 0x2f4b7a, 0xc8844c, 0.24, 2.25, 0xff9e4a, 2.85, 0.72],
+  ['Pôr do sol', 0x1e2952, 0xbb6942, 0.11, 2.58, 0xff7040, 2.25, 0.56],
+  ['Noite', 0x09101c, 0x111a2b, 0.48, 3.8, 0x89a6ff, 0.62, 0.22]
 ];
 
 // ---------- presets rápidos de dirigibilidade & regulador de tuning

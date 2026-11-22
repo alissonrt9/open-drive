@@ -25,8 +25,10 @@ const QUAL_NAMES = ['Baixa', 'Média', 'Alta'];
 
 const QA_TARGETS = {
   lumMin: 0.22,
-  lumMax: 0.50,
+  lumMax: 0.45,
+  p5Min: 0.03,
   contrastMin: 6.0,
+  contrastMax: 25.0,
   blackMaxPct: 1.0,
   clippedMaxPct: 2.0,
   maxCalls: 1200,
@@ -323,14 +325,17 @@ function evaluateTargets(metrics, info, isNight = false) {
   const lumOk = isNight
     ? metrics.meanLuminance >= 0.04 && metrics.meanLuminance <= 0.32
     : metrics.meanLuminance >= QA_TARGETS.lumMin && metrics.meanLuminance <= QA_TARGETS.lumMax;
-  const contrastOk = metrics.contrastRatio >= QA_TARGETS.contrastMin;
+  const p5Ok = isNight ? true : metrics.p5 >= QA_TARGETS.p5Min;
+  const contrastOk = isNight
+    ? metrics.contrastRatio >= QA_TARGETS.contrastMin
+    : metrics.contrastRatio >= QA_TARGETS.contrastMin && metrics.contrastRatio <= QA_TARGETS.contrastMax;
   const blackOk = isNight ? true : metrics.blackPct < QA_TARGETS.blackMaxPct;
   const clippedOk = metrics.clippedPct < QA_TARGETS.clippedMaxPct;
   const budgetOk = info.calls < QA_TARGETS.maxCalls && info.triangles < QA_TARGETS.maxTriangles;
 
   return {
-    pass: lumOk && contrastOk && blackOk && clippedOk && budgetOk,
-    checks: { lumOk, contrastOk, blackOk, clippedOk, budgetOk }
+    pass: lumOk && p5Ok && contrastOk && blackOk && clippedOk && budgetOk,
+    checks: { lumOk, p5Ok, contrastOk, blackOk, clippedOk, budgetOk }
   };
 }
 
