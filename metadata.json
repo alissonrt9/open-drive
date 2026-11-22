@@ -1,0 +1,6 @@
+{
+  "name": "OPEN DRIVE",
+  "description": "Simulador de direção 3D procedural em mundo aberto com física veicular a 120Hz, clima dinâmico e áudio sintetizado.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

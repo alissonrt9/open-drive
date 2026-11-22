@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>OPEN DRIVE</title>
+  <meta name="description" content="Simulador de direção 3D em mundo aberto com 5 biomas, iluminação PBR harmônica, física RK4 a 120Hz e tuning em tempo real." />
+  <meta property="og:title" content="OPEN DRIVE" />
+  <meta property="og:description" content="Simulador de direção 3D em mundo aberto com 5 biomas, iluminação PBR harmônica, física RK4 a 120Hz e tuning em tempo real." />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="stylesheet" href="/styles/main.css" />
+</head>
+<body>
+  <canvas id="gl"></canvas>
+  <canvas id="fx"></canvas>
+  <div id="fade"></div>
+
+  <!-- Tela: Menu Principal -->
+  <section id="menu" class="scr on" aria-label="Menu Principal">
+    <div>
+      <div class="logo">OPEN <b>DRIVE</b></div>
+      <div class="sub">Dirija. Só isso.</div>
+    </div>
+    <div>
+      <nav aria-label="Navegação principal">
+        <button class="go" data-a="drive">DRIVE</button>
+        <button data-a="garage">GARAGE</button>
+        <button data-a="tuning">AJUSTES / TUNING</button>
+        <button data-a="settings">SETTINGS</button>
+        <button data-a="controls">CONTROLS</button>
+      </nav>
+      <div class="biome-bar" aria-label="Seletor de Mapa">
+        <span class="biome-label">MAPA / BIOMA</span>
+        <div id="menuBiomes" class="biome-pills"></div>
+      </div>
+      <div class="note">Direção pura em mundo aberto · 5 biomas dinâmicos, tuning ao vivo (H) e suporte a modelos .glb.</div>
+    </div>
+  </section>
+
+  <!-- Tela: Garagem -->
+  <section id="garage" class="scr" aria-label="Garagem">
+    <div>
+      <div class="br" id="gb"></div>
+      <div class="cn" id="gn"></div>
+      <div class="br" id="gc"></div>
+    </div>
+    <div class="panel" id="gs"></div>
+    <div class="btns">
+      <button class="pill" data-a="prev" aria-label="Veículo anterior">←</button>
+      <button class="pill" data-a="next" aria-label="Próximo veículo">→</button>
+      <button class="pill" id="garageBiomeBtn" data-a="cycleBiome">MAPA: VALE ALPINO [B]</button>
+      <button class="pill" data-a="tuning">AJUSTES / TUNING [H]</button>
+      <button class="pill imp" data-a="importGlb">IMPORTAR CARRO REAL (.GLB)</button>
+      <button class="pill" data-a="menu">VOLTAR</button>
+      <button class="pill pri" id="gaction" data-a="drive">DRIVE</button>
+    </div>
+    <input type="file" id="glbInput" accept=".glb,.gltf,.bin,.png,.jpg,.jpeg,.webp" multiple hidden />
+  </section>
+
+  <!-- Tela: Configurações -->
+  <section id="settings" class="scr" aria-label="Configurações">
+    <div class="logo logo-sm">SETTINGS</div>
+    <div class="panel" id="sp"></div>
+    <div class="btns">
+      <button class="pill" data-a="menu">VOLTAR</button>
+    </div>
+  </section>
+
+  <!-- Tela: Controles -->
+  <section id="controls" class="scr" aria-label="Controles">
+    <div class="logo logo-sm">CONTROLS</div>
+    <div class="panel">
+      <div class="k">
+        <b>W / ↑</b><span>Acelerar</span>
+        <b>S / ↓</b><span>Frear / ré com ABS</span>
+        <b>A D / ← →</b><span>Direção sensível à velocidade</span>
+        <b>E / Q</b><span>Subir / descer marcha (Manual)</span>
+        <b>M</b><span>Alternar Câmbio Auto / Manual</span>
+        <b>H</b><span>Abrir / fechar Ajustes &amp; Tuning</span>
+        <b>B</b><span>Trocar Mapa / Bioma</span>
+        <b>Espaço</b><span>Freio de mão</span>
+        <b>C</b><span>Trocar câmera</span>
+        <b>R</b><span>Reposicionar na pista</span>
+        <b>T / V</b><span>Horário / clima</span>
+        <b>U</b><span>Ocultar / mostrar HUD</span>
+        <b>F</b><span>Tela cheia</span>
+        <b>ESC</b><span>Pausa / fechar ajustes</span>
+        <b>Gamepad</b><span>Stick, RT/LT, LB/RB, B, Y, Start</span>
+      </div>
+    </div>
+    <div class="btns">
+      <button class="pill" data-a="menu">VOLTAR</button>
+    </div>
+  </section>
+
+  <!-- Tela: Pausa -->
+  <section id="pause" class="scr" aria-label="Pausa">
+    <div class="logo logo-sm">PAUSA</div>
+    <nav aria-label="Menu de pausa">
+      <button class="go" data-a="resume">CONTINUAR</button>
+      <button data-a="tuning">AJUSTES / TUNING [H]</button>
+      <button id="pauseBiomeBtn" data-a="cycleBiome">MAPA: VALE ALPINO [B]</button>
+      <button data-a="menu">MENU</button>
+    </nav>
+    <div></div>
+  </section>
+
+  <!-- Painel Regulador de Dirigibilidade & Tuning (Tecla H ou botão na Garagem/Pausa) -->
+  <aside id="tuningPanel" aria-label="Regulador de Dirigibilidade e Tuning" aria-hidden="true">
+    <div class="tp-head">
+      <div>
+        <div class="tp-kicker">TELEMETRIA &amp; CHASSI EM TEMPO REAL</div>
+        <h2>AJUSTES DE DIRIGIBILIDADE</h2>
+      </div>
+      <button class="tp-close" id="tpClose" data-a="closeTuning" aria-label="Fechar ajustes">[H] FECHAR</button>
+    </div>
+
+    <div class="tp-presets" id="tpPresets" role="group" aria-label="Perfis rápidos de condução">
+      <button class="tp-preset" data-preset="arcade">ARCADE / FÁCIL</button>
+      <button class="tp-preset on" data-preset="forza">FORZA / EQUILIBRADO</button>
+      <button class="tp-preset" data-preset="sim">SIMULAÇÃO / PRO</button>
+    </div>
+
+    <div class="tp-sliders" id="tpSliders"></div>
+
+    <div class="tp-foot">
+      <span>Alterações salvas automaticamente · efeito imediato na pista</span>
+    </div>
+  </aside>
+
+  <!-- HUD de Telemetria -->
+  <div id="hud" aria-hidden="true">
+    <div id="hl">
+      <div id="hcar"></div>
+      <div id="htm"></div>
+      <div id="hbiome">VALE ALPINO · [B]</div>
+      <div id="hbadges">
+        <span id="txMode" class="hud-chip">AUTO · [M]</span>
+        <span id="hprofile" class="hud-chip">FORZA · TCS ON</span>
+        <span id="htuneHint" class="hud-chip">[H] AJUSTES</span>
+      </div>
+    </div>
+    <div id="mm">
+      <canvas id="minimap" width="180" height="180"></canvas>
+      <div id="surf">RODOVIA PRINCIPAL</div>
+    </div>
+    <div id="hr">
+      <div id="spd">0</div>
+      <div class="u">KM/H</div>
+      <div id="gear">N</div>
+      <div id="rb"><i></i></div>
+      <div id="hs">
+        <span id="est"></span>
+        <span id="sb"><i></i></span>
+      </div>
+    </div>
+    <div id="tachoWrap" aria-label="Conta-giros de corrida">
+      <div id="shiftLights" aria-hidden="true">
+        <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+      </div>
+      <canvas id="tachoCanvas" width="440" height="440"></canvas>
+      <div id="tachoCore">
+        <div id="tachoGear">N</div>
+        <div id="tachoRpm">900 RPM</div>
+        <div id="tachoHint"><b>Q</b> − · + <b>E</b></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Sky.js"></script>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
