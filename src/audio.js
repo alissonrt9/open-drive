@@ -16,7 +16,14 @@ let lastUpdTime = 0;
 
 export function aInit() {
   if (AC) return;
-  AC = new (window.AudioContext || window.webkitAudioContext)();
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return;
+  try {
+    AC = new AudioCtx();
+  } catch {
+    AC = null;
+    return;
+  }
   MG = AC.createGain();
   MG.gain.value = VV[set.vol];
   MG.connect(AC.destination);

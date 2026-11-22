@@ -300,7 +300,7 @@ export const P = {
   tractionLoss: false,
   eng: '',
   cy: 0,
-  cp: new THREE.Vector3()
+  cp: typeof THREE !== 'undefined' ? new THREE.Vector3() : { x: 0, y: 0, z: 0 }
 };
 
 export const IN = { g: 0, b: 0, s: 0, hb: 0 };

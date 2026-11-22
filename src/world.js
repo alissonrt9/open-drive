@@ -165,21 +165,23 @@ if (sky) {
     if (su.mieCoefficient) su.mieCoefficient.value = 0.0022;
     if (su.mieDirectionalG) su.mieDirectionalG.value = 0.74;
 
-    // Calibração suave no shader do THREE.Sky para evitar azul estourado/branco cegante
-    if (typeof sky.material.fragmentShader === 'string' && sky.material.fragmentShader.includes('gl_FragColor')) {
+    // Calibração suave no shader do THREE.Sky (declara uniforms no fragmentShader onde sunPosition não existe no r128)
+    const skyFrag = sky.material.fragmentShader;
+    const retColorRe = /gl_FragColor\s*=\s*vec4\(\s*retColor\s*,\s*1\.0\s*\)\s*;/;
+    if (typeof skyFrag === 'string' && skyFrag.includes('uniform vec3 up;') && retColorRe.test(skyFrag)) {
       su.uSoftTop = { value: new THREE.Color(0x4a7ab5) };
       su.uSoftHor = { value: new THREE.Color(0x9ec0e0) };
       su.uSoftWeight = { value: 0.42 };
-      sky.material.fragmentShader = sky.material.fragmentShader
+      sky.material.fragmentShader = skyFrag
         .replace(
-          'uniform vec3 sunPosition;',
-          `uniform vec3 sunPosition;
+          'uniform vec3 up;',
+          `uniform vec3 up;
           uniform vec3 uSoftTop;
           uniform vec3 uSoftHor;
           uniform float uSoftWeight;`
         )
         .replace(
-          /gl_FragColor\s*=\s*vec4\(\s*retColor\s*,\s*1\.0\s*\)\s*;/,
+          retColorRe,
           `vec3 skyDirNorm = normalize( vWorldPosition - cameraPosition );
           float skyElev = clamp( skyDirNorm.y, 0.0, 1.0 );
           vec3 restfulSky = mix( uSoftHor, uSoftTop, pow( skyElev, 0.56 ) );
@@ -477,43 +479,56 @@ export let renderPass = null;
 export let bloomPass = null;
 export let forzaPass = null;
 
-if (typeof THREE.EffectComposer === 'function' && typeof THREE.RenderPass === 'function' && typeof THREE.ShaderPass === 'function') {
-  const isWebGL2 = !!(R.capabilities && R.capabilities.isWebGL2);
-  let rt;
-  if (isWebGL2 && typeof THREE.WebGLMultisampleRenderTarget === 'function') {
-    rt = new THREE.WebGLMultisampleRenderTarget(Math.max(1, innerWidth), Math.max(1, innerHeight), {
-      minFilter: THREE.LinearFilter,
-      magFilter: THREE.LinearFilter,
-      format: THREE.RGBAFormat,
-      type: THREE.HalfFloatType || THREE.UnsignedByteType
-    });
-    rt.samples = 4;
-  } else {
-    rt = new THREE.WebGLRenderTarget(Math.max(1, innerWidth), Math.max(1, innerHeight), {
-      minFilter: THREE.LinearFilter,
-      magFilter: THREE.LinearFilter,
-      format: THREE.RGBAFormat,
-      type: isWebGL2 && THREE.HalfFloatType ? THREE.HalfFloatType : THREE.UnsignedByteType
-    });
-  }
-  composer = new THREE.EffectComposer(R, rt);
-  renderPass = new THREE.RenderPass(S, cam);
-  composer.addPass(renderPass);
+if (
+  typeof THREE.EffectComposer === 'function' &&
+  typeof THREE.RenderPass === 'function' &&
+  typeof THREE.ShaderPass === 'function' &&
+  typeof THREE.CopyShader === 'object'
+) {
+  try {
+    const isWebGL2 = !!(R.capabilities && R.capabilities.isWebGL2);
+    let rt;
+    if (isWebGL2 && typeof THREE.WebGLMultisampleRenderTarget === 'function') {
+      rt = new THREE.WebGLMultisampleRenderTarget(Math.max(1, innerWidth), Math.max(1, innerHeight), {
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        format: THREE.RGBAFormat,
+        type: THREE.HalfFloatType || THREE.UnsignedByteType
+      });
+      rt.samples = 4;
+    } else {
+      rt = new THREE.WebGLRenderTarget(Math.max(1, innerWidth), Math.max(1, innerHeight), {
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        format: THREE.RGBAFormat,
+        type: isWebGL2 && THREE.HalfFloatType ? THREE.HalfFloatType : THREE.UnsignedByteType
+      });
+    }
+    composer = new THREE.EffectComposer(R, rt);
+    renderPass = new THREE.RenderPass(S, cam);
+    composer.addPass(renderPass);
 
-  if (typeof THREE.UnrealBloomPass === 'function') {
-    bloomPass = new THREE.UnrealBloomPass(
-      new THREE.Vector2(Math.max(1, Math.floor(innerWidth * 0.5)), Math.max(1, Math.floor(innerHeight * 0.5))),
-      0.22,
-      0.55,
-      0.92
-    );
-    composer.addPass(bloomPass);
-  }
+    if (typeof THREE.UnrealBloomPass === 'function' && typeof THREE.LuminosityHighPassShader === 'object') {
+      bloomPass = new THREE.UnrealBloomPass(
+        new THREE.Vector2(Math.max(1, Math.floor(innerWidth * 0.5)), Math.max(1, Math.floor(innerHeight * 0.5))),
+        0.22,
+        0.55,
+        0.92
+      );
+      composer.addPass(bloomPass);
+    }
 
-  forzaPass = new THREE.ShaderPass(ForzaFilmicCameraShader);
-  if (forzaPass.material) forzaPass.material.toneMapped = false;
-  forzaPass.renderToScreen = true;
-  composer.addPass(forzaPass);
+    forzaPass = new THREE.ShaderPass(ForzaFilmicCameraShader);
+    if (forzaPass.material) forzaPass.material.toneMapped = false;
+    forzaPass.renderToScreen = true;
+    composer.addPass(forzaPass);
+  } catch (err) {
+    console.warn('Pós-processamento desativado (fallback para renderização direta):', err);
+    composer = null;
+    renderPass = null;
+    bloomPass = null;
+    forzaPass = null;
+  }
 }
 
 export function resizeComposer(w, h, pr) {

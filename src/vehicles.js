@@ -439,8 +439,33 @@ function isStrictWheelMesh(node, model) {
   return isStrictWheelName(node.name || '', ancestors);
 }
 
+function disposeGlbResources(root, protectedMats) {
+  if (!root) return;
+  const texProps = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'alphaMap'];
+  root.traverse(node => {
+    if (node.geometry && typeof node.geometry.dispose === 'function') {
+      node.geometry.dispose();
+    }
+    if (node.material) {
+      const mats = Array.isArray(node.material) ? node.material : [node.material];
+      mats.forEach(mat => {
+        if (!mat || protectedMats.has(mat)) return;
+        texProps.forEach(prop => {
+          if (mat[prop] && typeof mat[prop].dispose === 'function') mat[prop].dispose();
+        });
+        if (typeof mat.dispose === 'function') mat.dispose();
+      });
+    }
+  });
+}
+
 function applyGLBToVehicle(model, s, vehicleRefs, objectUrls = [], modelName = '') {
   if (!model) return;
+
+  const box0 = new THREE.Box3().setFromObject(model);
+  if (box0.isEmpty()) {
+    throw new Error('Modelo .glb vazio ou sem geometrias visíveis');
+  }
 
   if (Array.isArray(vehicleRefs.glbPivots)) {
     vehicleRefs.glbPivots.forEach(p => vehicleRefs.bd.remove(p));
@@ -449,15 +474,19 @@ function applyGLBToVehicle(model, s, vehicleRefs, objectUrls = [], modelName = '
 
   if (vehicleRefs.glbModel) {
     vehicleRefs.bd.remove(vehicleRefs.glbModel);
+    disposeGlbResources(vehicleRefs.glbModel, new Set([vehicleRefs.tl, M.glass, M.tire, M.chrome]));
     vehicleRefs.glbModel = null;
   }
   if (Array.isArray(vehicleRefs.glbObjectUrls)) {
     vehicleRefs.glbObjectUrls.forEach(u => URL.revokeObjectURL(u));
   }
+  if (Array.isArray(vehicleRefs.extraTexUrls)) {
+    vehicleRefs.extraTexUrls.forEach(u => URL.revokeObjectURL(u));
+    vehicleRefs.extraTexUrls = [];
+  }
   vehicleRefs.glbObjectUrls = objectUrls;
   vehicleRefs.glbName = modelName || s.n;
 
-  const box0 = new THREE.Box3().setFromObject(model);
   const size0 = box0.getSize(new THREE.Vector3());
   if (size0.z > size0.x * 1.15) {
     model.rotation.y = Math.PI / 2;

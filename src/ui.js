@@ -538,13 +538,18 @@ export function pick(n) {
   fillGarage();
 }
 
+let going = false;
+
 export function go() {
+  if (going) return;
+  going = true;
   $('#fade').style.opacity = 1;
   setTimeout(() => {
     startDrive();
     resetFx();
     show('drive');
     $('#fade').style.opacity = 0;
+    going = false;
   }, 500);
 }
 
